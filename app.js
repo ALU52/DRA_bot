@@ -178,19 +178,21 @@ client.on("message", (msg) => {
             guilds.forEach(g => {//for each configured guild
                 Object.getOwnPropertyNames(g.links).forEach(i => {//for each server under the guild
                     if (i === msg.guild.id) {//if the server matches this one
-                        let links = g.links[msg.guild.id]//changed for debugging, should be server id
-                        if (!links) return;
+                        if (!g.links[msg.guild.id]) return//if nothing is there
+                        let links = g.links[msg.guild.id]
                         links.forEach(r => {//in case theres multiple roles tied to it
+                            if (r == null) return
                             collected.push({ "role": r.role, "rank": r.rank, "name": g.name })
                         })
                     }
                 })
             })
             let codeBlock = ""//the string to build for the embed
-            collected.forEach(l => {
-                codeBlock += `\n> [Rank:${l.rank}] <@&${l.role}> => ${l.name}`
-            })
-            if (collected.length === 0) codeBlock = "```No links were found in this server```"
+            if (collected.length == 0) codeBlock = "```No links were found in this server```"; else {
+                collected.forEach(l => {
+                    codeBlock += `\n> [Rank:${l.rank}] <@&${l.role}> => ${l.name}`
+                })
+            }
             msg.channel.send({//send the embed after the code block gets built
                 "embed": {
                     "title": "Linked roles",
