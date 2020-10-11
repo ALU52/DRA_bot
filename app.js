@@ -581,4 +581,17 @@ client.on('error', (err) => {
 process.on('uncaughtException', (err) => {
     log('ERR', `Uncaught exception: ${err.name}:${err.message} - ${err.stack}`)
 })
+//communication with parent
+process.on('message', (m) => {
+    switch (m) {
+        case "shutdown":
+            log('INFO', "Looks like the parent wants a shutdown...")
+            process.exit(0)
+            break;
+
+        default:
+            log('WARN', `I received a message, but I'm not sure what "${m}" means`)
+            break;
+    }
+})
 //#endregion
