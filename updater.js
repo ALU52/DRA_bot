@@ -7,6 +7,7 @@ const files = fs.readdirSync("./").filter(f => !ignore.includes(f)).filter(f => 
 
 //github is always right
 const bot = child.fork("./app.js")
+let needsRestart
 
 log('WARN', "Cold start detected")
 checkUpdates()//checks at startup
@@ -15,7 +16,7 @@ let updater = setInterval(() => {
 }, 3.6e+6);//checks for updates every hour
 
 function checkUpdates() {
-    let needsRestart = false;
+    needsRestart = false;
     files.forEach(f => {//for each file not on the ignore list
         //backup the file first
         try {
@@ -67,9 +68,10 @@ function checkUpdates() {
 }
 
 function restart() {
+    needsRestart = false;
     log('INFO', "Looks like a restart is needed. Sending shutdown message to the bot...")
     bot.send("shutdown")//tells it to stop and waits until it exits
-    bot.once('exit', (c) => {
+    bot.once('close', (c) => {//not sure if this is any different from 'exit'
         log('INFO', "Parent detected bot shutdown - starting it back up to apply updates")
         if (c == 0) {//makes sure its a 0 exit code so it didn't just crash
             setTimeout(() => {
@@ -80,6 +82,7 @@ function restart() {
 }
 
 bot.on('disconnect', () => {
+    if (needsRestart) return; //ignore if its restarting
     log('WARN', "The parent lost connection to the bot! Updates have been disabled.")
     clearInterval(updater)
 })
