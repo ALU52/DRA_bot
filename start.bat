@@ -1,3 +1,3 @@
 @echo off
-node app.js
+node updater.js
 pause

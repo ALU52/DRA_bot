@@ -1,7 +1,7 @@
 const https = require('https')
 const fs = require('fs')
 const child = require('child_process')
-const homeURL = "https://raw.githubusercontent.com/ALU52/GwA-Bot/main/"
+const homeURL = "https://raw.githubusercontent.com/ALU52/GwA-Bot/master/"
 const ignore = ["updater.js", "config.json", "app.log", "node_modules", "accounts.json", ".git"]
 const files = fs.readdirSync("./").filter(f => !ignore.includes(f)).filter(f => !f.includes(".bak"))
 
