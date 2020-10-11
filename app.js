@@ -208,7 +208,7 @@ client.on("message", (msg) => {
             }
             let lembed = {
                 "embed": {
-                    "description": "Oldest are at the top```md" + lstring + "```",
+                    "description": "Newest events are at the top```md" + lstring + "```",
                     "color": config.defaultColor
                 }
             }
