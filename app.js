@@ -13,7 +13,15 @@ const client = new Discord.Client();
 var helpEmbed = {
     "embed": {
         "title": "Help",
-        "description": "My job is to integrate this server with the Gw2 API\n**Commands:**\n\`\`\`\n> Help\n> Ping\n> Link\n> Unlink\n> Stats\`\`\`\n**Admin commands:**\n\`\`\`\n> linkRole\n> unlinkRole\n> roleLinks\`\`\`",
+        "description": "My job is to integrate this server with the Gw2 API\n**Commands:**\n\`\`\`\n> Help\n> Ping\n> Link\n> Unlink\n> Stats\n> GuildList\`\`\`\n**Admin commands:**\n\`\`\`\n> linkRole\n> unlinkRole\n> roleLinks\`\`\`",
+        "color": config.defaultColor,
+    }
+}
+
+var linkHelp = {
+    "embed": {
+        "title": "Role linking guide",
+        "description": "Each role can be linked to a seperate role within a guild. If you'd like everybody in the guild to have that role, link it to rank 0.\n**How it works:**\nThe rank number starts from the highest position, with #1 being the Leader, and the number increases as you go down the list.\nDue to API restrictions, ranks greater than 0 require the guild owner to link their account. Otherwise, I cant see which ranks exist",
         "color": config.defaultColor,
     }
 }
@@ -26,15 +34,6 @@ var setupEmbed = {
     }
 }
 //#endregion
-
-client.on("ready", () => {
-    console.log(`${client.user.username} is ready!`);
-    client.user.setActivity(`out for ${config.prefix}`, { 'type': "WATCHING" })
-});
-
-//make a queue system so the API wont be spammed
-//have the guilds checked once an hour
-//dont forget to tell them the prefix when it gets mentioned, and make sure it excludes @everyone and @roles
 
 //#region Message handler
 client.on("message", (msg) => {
@@ -108,7 +107,7 @@ client.on("message", (msg) => {
             if (args.length !== 3) {//show help message if args are wrong
                 msg.channel.send({
                     "embed": {
-                        "description": "This command links a role to a guild to be assigned automatically\nUsage: linkRole <roleID> <rank> <guildTag/name>",
+                        "description": "This command links a role to a guild to be assigned automatically\n**Usage:** linkRole <roleID> <rank> <guildTag>\nThe rank should be a number 1-9. The rank number depends on the order in the guild. 0 will be given to every member of the guild. Otherwise, they increase, with the highest rank being first. E.g. The leader = 1",
                         "color": 8311585
                     }
                 })
@@ -116,12 +115,12 @@ client.on("message", (msg) => {
             } else {
                 //should search for the guild tag first
                 let guild = searchGuilds(args[2])//search for the guild
-                if (!guild) { msg.reply(`I couldn't find any guilds under "${args[2]}" Please use a guild name or tag`); return }
+                if (!guild) { msg.reply(`I couldn't find any guilds under "${args[2]}"\nYou may have to link your account first`); return }
                 let server = guild.links[msg.guild.id]//find or create the server under the guild
                 if (!server) { guild.links[msg.guild.id] = []; server = guild.links[msg.guild.id] }//create a new one if it doesn't exist and assign it
                 let role = msg.guild.roles.cache.find(r => r.id == args[0])
                 let rank = parseInt(args[1])
-                if (rank === NaN) { msg.reply(`the rank should be a number 0-9. Instead received "${args[1]}". Rank 0 is given to everyone`); return; }
+                if (rank === NaN) { msg.reply(`use this command without arguments to see its usage`); return; }
                 if (!role) { msg.reply("it looks like that role doesn't exist. Please use a role ID"); return }
                 prompt(msg.author, msg.channel, `This will link <@&${role.id}> to ${guild.name}\nContinue?`).then(r => {
                     if (r) {
@@ -179,7 +178,7 @@ client.on("message", (msg) => {
             guilds.forEach(g => {//for each configured guild
                 Object.getOwnPropertyNames(g.links).forEach(i => {//for each server under the guild
                     if (i === msg.guild.id) {//if the server matches this one
-                        let links = g.links[msg.guild.id]
+                        let links = g.links[msg.guild.id]//changed for debugging, should be server id
                         links.forEach(r => {//in case theres multiple roles tied to it
                             collected.push({ "role": r.role, "rank": r.rank, "name": g.name })
                         })
@@ -188,40 +187,51 @@ client.on("message", (msg) => {
             })
             let codeBlock = ""//the string to build for the embed
             collected.forEach(l => {
-                codeBlock += `\n> <@&${l.role}>[${l.rank}] => ${l.name}`
+                codeBlock += `\n> [Rank:${l.rank}] <@&${l.role}> => ${l.name}`
             })
-            codeBlock += ``
             if (collected.length === 0) codeBlock = "```No links were found in this server```"
             msg.channel.send({//send the embed after the code block gets built
                 "embed": {
                     "title": "Linked roles",
-                    "description": "Roles and the guilds they're linked to:\n" + codeBlock,
+                    "description": "Roles and the guilds they're linked to:" + codeBlock,
                     "color": config.defaultColor,
                 }
             })
             break;
 
         case "log":
-            let string = ""//this command is broken, it seems to crash the program, or completely skip the counting part
-            let maxLines = 10
-            let log = fs.readFileSync(config.logPath).toString().split("\n")
+            let lstring = ""//this command is broken, it seems to crash the program, or completely skip the counting part
+            let lmaxLines = 10
+            let llog = fs.readFileSync(config.logPath).toString().split("\n")
             for (let i = log.length; i > 0 && i > log.length - maxLines; i--) {//counts backwards from the length without exceeding the max
                 string += "\n" + log[i].trim()
             }
-            let embed = {
+            let lembed = {
                 "embed": {
                     "description": "▲ The most recent events are at the top```md\n" + string + "```",
                     "color": config.defaultColor
                 }
             }
-            msg.channel.send(embed)
+            msg.channel.send(lembed)
+            break;
+
+        case "guildlist":
+            let glist = "";
+            config.guilds.forEach(g => glist += "\n- " + g.name)
+            msg.channel.send({
+                "embed": {
+                    "title": "Registered guild list",
+                    "description": "```md\n" + glist + "```",
+                    "color": config.defaultColor
+                }
+            })
             break;
 
         case "guildrefresh":
             //only for the guild owner. This fetches ranks and updates the cached version
-            let updatedRanks = 0;
-            let addedRanks = 0
-            let report = ""
+            let rupdatedRanks = 0;
+            let raddedRanks = 0
+            let rreport = ""
             //builds a report so the guild owners know it worked
             //the rest is not implemented yet //////////////////
             break;
@@ -278,7 +288,19 @@ const queueManager = setInterval(() => {
                     })
                 })
             } catch (err) {//failed to fetch guilds
-                log('ERR', `Failed to fetch guilds for ${user.id}`)
+                log('ERR', `Failed to fetch guilds for ${user.id}! Unlinking their account`)
+                client.users.fetch(link.id).then(u => {//let the user know there was an error and their account has been unlinked
+                    let acc = accounts.findIndex(a => a.id == msg.author.id)
+                    accounts.splice(acc)
+                    u.send({
+                        "embed": {
+                            "embed": {
+                                "description": "❌ Something went wrong when I checked your Gw2 account! It's likely that the API key was deleted\nTo avoid spamming the API, your account was automatically unlinked",
+                                "color": 15609652
+                            }
+                        }
+                    })
+                })
             }
         } else {
             console.log(`No link was found for ${user.user.tag}`)
@@ -315,7 +337,12 @@ function handleWaitResponse(user, content) {
                 r.guilds.forEach(g => {//callback for each guild the user is in
                     if (config.guilds.find(i => i.id == g)) return//ignores guilds it already knows about
                     else {
-                        newGuild(g, key)
+                        if (r.guild_leader || r.guild_leader.includes(g)) {
+                            //owner mode
+                            newGuild(g, key, true)
+                        } else {
+                            newGuild(g, key)
+                        }
                     }
                 })
             })
@@ -333,7 +360,7 @@ function handleWaitResponse(user, content) {
         console.log("New link:" + user.id)
         user.send({
             "embed": {
-                "description": "✅ Your account was linked successfully. You'll receive your roles within a few minutes",
+                "description": "✅ Your account was linked successfully",
                 "color": 8311585
             }
         })
@@ -341,34 +368,122 @@ function handleWaitResponse(user, content) {
 }
 
 /**
- * Searches the internal guild storage for guilds
- * @param {string} query Either a guild tag or name
+ * Searches through the guilds and returns the closest thing found
+ * @param {string} query The name or tag
  */
 function searchGuilds(query) {
-    let guild;
-    if (query.length <= 4) {//tag mode
-        guild = config.guilds.find(g => g.tag == query)
-    } else {//name mode
-        guild = config.guilds.find(g => g.name.includes(query))
+    let string = normalizeString(query)
+    let result = null
+    config.guilds.forEach(g => {//first try the names - probably the best way to do it
+        if (normalizeString(g.name).includes(string)) {
+            result = g
+            return;
+        }
+    })
+    if (!result) {
+        config.guilds.forEach(g => {//next try aliases
+            if (!g.aliases || g.aliases == []) return;//skip if there aren't any
+            g.aliases.forEach(a => {//for each one
+                if (normalizeString(a).includes(string)) {
+                    result = g
+                    return;
+                }
+            })
+        })
     }
-    return guild
+    if (!result) {
+        config.guilds.forEach(g => {//lastly, try guild tags
+            if (normalizeString(g.tag).includes(string)) {
+                result = g
+                return;
+            }
+        })
+    }
+    return result
 }
+
+//need to add support for guild owners of a guild already registered
+//only edit stuff
+
+
 
 /**
  * Saves a new guild
  * @param {string} id The guild ID to add
  * @param {string} key The API key to use
+ * @param {boolean} owner Whether the user adding the guild is the owner. False by default
  */
-function newGuild(id, key) {
+function newGuild(id, key, owner) {
     //new function must be added that also reads the guild ranks if its the guild owner
     if (!config.guilds.find(g => g.id == id)) {//ignores if its already there
+        let leader;
+        let newGuild = { "aliases": [], "ranks": [], "links": {} }
+        if (!owner) leader = false; else leader = owner;
         apiFetch('guild/' + id, key).then(res => {//request more info about the guild, and register it
-            let newGuild = { "id": res.id, "name": res.name, "ranks": [], "tag": res.tag, "links": {} }
+            newGuild.id = res.id;
+            newGuild.name = res.name;
+            newGuild.tag = res.tag;
             log('INFO', `New guild registered: ` + res.name)
+            if (leader) {
+                log('INFO', `Leader detected, adding ranks`)
+                apiFetch(`guild/${g}/ranks`, key).then(ranks => {
+                    ranks.forEach(r => {//append each rank to the guild object
+                        newGuild.ranks.push({ "id": r.id, "order": r.order, "icon": r.icon })
+                    })
+                })
+            }
             config.guilds.push(newGuild)
         })
     }
     ///////
+}
+
+/**
+ * Converts all characters in a string to the normal letter that best represents it
+ * @param {string} string The string to process
+ */
+function normalizeString(string) {
+    let result = ''
+    let key = Object.getOwnPropertyNames(characterMap)
+    string.split('').forEach(l => {
+        for (let i = 0; i < key.length; i++) {//cycles through each part of the map until it found a mach for the letter
+            if (characterMap[key[i]].includes(l)) {//if that part of the map has the letter correct character in it
+                result += key[i]
+                return;
+            }
+        }
+    })
+    return result
+}
+
+const characterMap = {//this is probably the worst thing I've ever created // cases are separated because I'm not sure how lenient string.includes() is
+    'a': ['A', 'a', 'À', 'Á', 'Â', 'Ã', 'Ä', 'Å', 'Æ', 'æ', 'ä'],
+    'b': ['B', 'b', 'ß', 'ç', 'Ć', 'ć', 'Ĉ', 'ĉ', 'Ċ', 'ċ', 'Č', 'č'],
+    'c': ['C', 'c', 'ç', 'Ć', 'ć', 'Ĉ', 'ĉ', 'Ċ', 'ċ', 'Č', 'č'],
+    'd': ['D', 'd', 'Ď', 'ď', 'Đ', 'đ'],
+    'e': ['E', 'e', 'È', 'É', 'Ê', 'Ë', 'è', 'é', 'ê', 'ë', 'Æ', "æ"],
+    'f': ['F', 'f'],
+    'g': ['G', 'g', 'Ĝ', 'ĝ', 'Ğ', 'ğ', 'Ġ', 'ġ', 'Ģ', 'ģ'],
+    'h': ['H', 'h', 'Ĥ', 'ĥ', 'Ħ', 'ħ'],
+    'i': ['I', 'i', 'Ì', 'Í', 'Î', 'Ï', 'ĳ', 'Ĳ', 'ï'],
+    'j': ['J', 'j', 'ĳ', 'Ĵ', 'ĵ', 'Ĳ'],
+    'k': ['K', 'k', 'Ķ', 'ķ', 'ĸ'],
+    'l': ['L', 'l', 'Ĺ', 'ĺ', 'Ļ', 'ļ', 'Ľ', 'ľ', 'Ŀ', 'ŀ', 'Ł', 'ł'],
+    'm': ['M', 'm'],
+    'n': ['N', 'n', 'Ń', 'ń', 'Ņ', 'ņ', 'Ň', 'ň', 'ŉ', 'Ŋ', 'ŋ'],
+    'o': ['O', 'o', 'Ō', 'ō', 'Ŏ', 'ŏ', 'Ő', 'ő', 'Œ', 'œ'],
+    'p': ['P', 'p'],
+    'q': ['Q', 'q'],
+    'r': ['R', 'r', 'Ŕ', 'ŕ', 'Ŗ', 'ŗ', 'Ř', 'ř'],
+    's': ['S', 's', 'Ś', 'ś', 'Ŝ', 'ŝ', 'Ş', 'ş', 'Š', 'š'],
+    't': ['T', 't', 'Ţ', 'ţ', 'Ť', 'ť', 'Ŧ', 'ŧ'],
+    'u': ['U', 'u', 'Ũ', 'ũ', 'Ū', 'ū', 'Ŭ', 'ŭ', 'Ů', 'ů', 'Ű', 'ű', 'Ų', 'ų'],
+    'v': ['V', 'v'],
+    'w': ['W', 'w', 'Ŵ', 'ŵ'],
+    'x': ['X', 'x'],
+    'y': ['Y', 'y', 'Ŷ', 'ŷ', 'Ÿ'],
+    'z': ['Z', 'z', 'Ź', 'ź', 'Ż', 'ż', 'Ž', 'ž'],
+    ' ': [' ']
 }
 
 /**
@@ -448,11 +563,22 @@ function prompt(who, channel, text) {
 }
 //#endregion
 
-//#region Error zone
+//#region Operation events
+client.on("ready", () => {
+    console.log(`${client.user.username} is ready!`);
+    client.user.setActivity(`out for ${config.prefix}`, { 'type': "WATCHING" })
+    log('INFO', "Logged in and ready to go")
+});
+client.on('disconnect', () => {
+    log('ERR', `I've lost connection to the Discord API!`)
+})
+client.on('warn', (warn) => {
+    log('WARN', warn)
+})
 client.on('error', (err) => {
-    log('ERR', err.message)
+    log('ERR', `Uncaught exception: ${err.name}:${err.message} - ${err.stack}`)
 })
 process.on('uncaughtException', (err) => {
-    log('ERR', err.message)
+    log('ERR', `Uncaught exception: ${err.name}:${err.message} - ${err.stack}`)
 })
 //#endregion
