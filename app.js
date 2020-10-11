@@ -203,12 +203,12 @@ client.on("message", (msg) => {
             let lstring = ""//this command is broken, it seems to crash the program, or completely skip the counting part
             let lmaxLines = 10
             let llog = fs.readFileSync(config.logPath).toString().split("\n")
-            for (let i = log.length; i > 0 && i > log.length - maxLines; i--) {//counts backwards from the length without exceeding the max
-                string += "\n" + log[i].trim()
+            for (let i = llog.length; i > 0 && i > llog.length - lmaxLines; i--) {//counts backwards from the length without exceeding the max
+                if (llog[i]) lstring += "\n" + llog[i]//skip if empty
             }
             let lembed = {
                 "embed": {
-                    "description": "▲ The most recent events are at the top```md\n" + string + "```",
+                    "description": "Oldest are at the top```md" + lstring + "```",
                     "color": config.defaultColor
                 }
             }
@@ -337,12 +337,7 @@ function handleWaitResponse(user, content) {
                 r.guilds.forEach(g => {//callback for each guild the user is in
                     if (config.guilds.find(i => i.id == g)) return//ignores guilds it already knows about
                     else {
-                        if (r.guild_leader || r.guild_leader.includes(g)) {
-                            //owner mode
-                            newGuild(g, key, true)
-                        } else {
-                            newGuild(g, key)
-                        }
+                        newGuild(g, key, r.guild_leader.includes(g))//passes true to the function if they own the server
                     }
                 })
             })
@@ -432,7 +427,9 @@ function newGuild(id, key, owner) {
                     })
                 })
             }
-            config.guilds.push(newGuild)
+            setTimeout(() => {//wait for ranks to fetch - ik theres better ways to do this
+                config.guilds.push(newGuild)
+            }, 1000);
         })
     }
     ///////
