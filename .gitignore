@@ -1,4 +1,7 @@
-config.json
+
 accounts.json
-config.json
 test.js
+node_modules
+app.log
+package-lock.json
+config.json
