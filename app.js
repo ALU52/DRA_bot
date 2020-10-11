@@ -160,7 +160,7 @@ client.on("message", (msg) => {
                 let index = server.findIndex(r => r.role == role.id)//find the given role
                 if (index == -1) { msg.reply("this role is not linked to any guilds"); return }
                 else {//linked role
-                    server[index] = null;//this might not work ////////// must delete the role
+                    server[index] = {};//set to empty
                     msg.channel.send({
                         "embed": {
                             "description": "✅ " + "<@&" + role.id + "> was unlinked from " + guild.name,
@@ -204,7 +204,7 @@ client.on("message", (msg) => {
 
         case "log":
             let lstring = ""//this command is broken, it seems to crash the program, or completely skip the counting part
-            let lmaxLines = 10
+            let lmaxLines = 20
             let llog = fs.readFileSync(config.logPath).toString().split("\n")
             for (let i = llog.length; i > 0 && i > llog.length - lmaxLines; i--) {//counts backwards from the length without exceeding the max
                 if (llog[i]) lstring += "\n" + llog[i]//skip if empty
@@ -237,6 +237,12 @@ client.on("message", (msg) => {
             let rreport = ""
             //builds a report so the guild owners know it worked
             //the rest is not implemented yet //////////////////
+            break;
+
+        case "debug":
+            //returns a raw guild so all the data can be seen
+            let g = searchGuilds(args[0])
+            msg.channel.send("```json\n" + JSON.stringify(g) + "```")
             break;
 
         default:
