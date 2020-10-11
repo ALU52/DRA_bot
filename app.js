@@ -171,7 +171,7 @@ client.on("message", (msg) => {
             }
             break;
 
-        case "rolelinks":
+        case "rolelinks"://this command keeps crashing the bot
             let guilds = config.guilds.filter(g => Object.getOwnPropertyNames(g.links).includes(msg.guild.id))//find all the guilds tied to this server
             let collected = []
             //create a list of configured roles for this server
@@ -179,6 +179,7 @@ client.on("message", (msg) => {
                 Object.getOwnPropertyNames(g.links).forEach(i => {//for each server under the guild
                     if (i === msg.guild.id) {//if the server matches this one
                         let links = g.links[msg.guild.id]//changed for debugging, should be server id
+                        if (!links) return;
                         links.forEach(r => {//in case theres multiple roles tied to it
                             collected.push({ "role": r.role, "rank": r.rank, "name": g.name })
                         })
