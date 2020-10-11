@@ -1,0 +1,50 @@
+{"prefix": "ta.",
+    "owner": {
+        "id": "653082608871276584"
+    },
+    "blacklist": [],
+    "logPath": "./app.log",
+    "accountsPath": "./accounts.json",
+    "defaultColor": "#7289DA",
+    "inviteURL": "https://discord.com/api/oauth2/authorize?client_id=763982717846159370&permissions=402702422&scope=bot",
+    "guilds": [
+        {
+            "id": "7ED09727-D93B-E511-A5A9-AC162DAE5A05",
+            "name": "Thee Wombo Combo",
+            "aliases": [],
+            "ranks": [],
+            "tag": "WBCB",
+            "links": {
+                "serverID": [
+                    {
+                        "rank": 0,
+                        "role": "roleID"
+                    }
+                ]
+            }
+        },
+        {
+            "id": "F2C55420-F7CB-E611-80D4-E4115BD19D24",
+            "name": "Chïldren Of The Nïght",
+            "ranks": [
+                "vamp",
+                "vamps"
+            ],
+            "tag": "Vämp",
+            "links": {
+                "737353526417555506": [
+                    {
+                        "rank": 0,
+                        "role": "764196898432221195"
+                    }
+                ]
+            }
+        },
+        {
+            "id": "7D0DB7CC-02FE-E911-81AA-A77AA130EAB8",
+            "name": "Samayous Tiny Army",
+            "ranks": [],
+            "tag": "TINY",
+            "links": {}
+        }
+    ]}
