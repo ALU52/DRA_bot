@@ -1,0 +1,41 @@
+{
+    "Normally": "there'd be other stuff in this file too",
+    "guilds": [
+        {
+            "name": "Example guild",
+            "tag": "TEST",
+            "id": "exampleguildIDthesearereallylongforsomereasonlol",
+            "servers": {
+                "exampleDiscordServerID": [
+                    {
+                        "rank": 0,
+                        "role": "memberRoleID"
+                    },
+                    {
+                        "rank": 1,
+                        "role": "leaderRoleID"
+                    }
+                ],
+                "otherServer": [
+                    {
+                        "rank": 1,
+                        "role": "leaderRoleID"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "Better guild",
+            "tag": "YOLO",
+            "id": "justkiddingIneversayyoloandneithershouldyou",
+            "servers": {
+                "otherDiscord": [
+                    {
+                        "rank": 0,
+                        "role": "everybodyGetsThisOne"
+                    }
+                ]
+            }
+        }
+    ]
+}
