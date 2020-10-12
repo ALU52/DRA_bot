@@ -8,6 +8,7 @@ var waitList = new Set();
 var roleQueue = []
 
 const client = new Discord.Client();
+const colors = { "success": 8311585, "error": 15609652 }
 
 //#region Embeds
 var helpEmbed = {
@@ -34,6 +35,9 @@ var setupEmbed = {
     }
 }
 //#endregion
+
+//update embed colors with the colors object
+
 
 //#region Message handler
 client.on("message", (msg) => {
@@ -137,6 +141,8 @@ client.on("message", (msg) => {
                     } else {
                         msg.reply("action canceled")
                     }
+                }).catch(() => {
+                    msg.reply("action canceled")
                 })
             }
             break;
@@ -150,21 +156,33 @@ client.on("message", (msg) => {
                         "color": 8311585
                     }
                 })
-            } else {
-                let role = msg.guild.roles.cache.find(r => r.id == args[0])//makes sure the role exists first
-                if (!role) { msg.reply("it looks like that role doesn't exist. Please use a role ID"); return }
-                let guild = config.guilds.find((g) => g.links[msg.guild.id])//find the server under the guild
-                if (!guild) { msg.reply("this guild is not registered to any roles"); return }//this should never happen, but just in case
-                let server = guild.links[msg.guild.id]//edited for debugging - change this back to msg.guild.id//returns an array of linked roles for the guild object
-                if (!server) { msg.reply("it looks like that guild isn't registered to this server, there's nothing to unlink."); return }//the guild doesn't have the server
-                let index = server.findIndex(r => r.role == role.id)//find the given role
-                if (index == -1) { msg.reply("this role is not linked to any guilds"); return }
-                else {//linked role
-                    server[index] = {};//set to empty
+            } else {//looks like this part needs to be re-written too
+                let role = msg.guild.roles.cache.find(r => r.id == args[0])
+                if (!role) { msg.reply("this role doesn't exist"); return; }
+                let linkedGuilds = config.guilds.filter(g => g.links[msg.guild.id])//filters out any guilds without links to this server
+                if (!linkedGuilds) { msg.reply("this role isn't linked to any guilds"); return; }
+                try {
+                    linkedGuilds.forEach(g => {
+                        let links = g.links['737353526417555506']
+                        if (!links) { return; } else {
+                            let index = links.findIndex(l => l.role == role.id)
+                            if (index != -1) {
+                                msg.channel.send({
+                                    "embed": {
+                                        "description": `✅ <@&${links[index].role}> Was unlinked from ${g.name}`,
+                                        "color": colors.success
+                                    }
+                                })
+                                links.splice(index)
+                            }
+                        }
+                    })
+                } catch (error) {
+                    log('ERR', `Failed to delete link to ${args[0]} : ${error}`)
                     msg.channel.send({
                         "embed": {
-                            "description": "✅ " + "<@&" + role.id + "> was unlinked from " + guild.name,
-                            "color": 8311585
+                            "description": "❌ Failed to unlink this role, check `rolelinks`, It might not exist",
+                            "color": 15609652
                         }
                     })
                 }
