@@ -14,7 +14,7 @@ const colors = { "success": 8311585, "error": 15609652 }
 var helpEmbed = {
     "embed": {
         "title": "Help",
-        "description": "My job is to integrate this server with the Gw2 API\n**Commands:**\n\`\`\`\n> Help\n> Ping\n> Link\n> Unlink\n> Stats\n> GuildList\`\`\`\n**Admin commands:**\n\`\`\`\n> linkRole\n> unlinkRole\n> roleLinks\`\`\`",
+        "description": "My job is to integrate this server with the Gw2 API\n**Commands:**\n\`\`\`\n> Help\n> Ping\n> Link\n> Unlink\n> Stats\n> GuildList\`\`\`\n**Admin commands:**\n\`\`\`\n> roleAdd\n> roleRemove\n> roles\`\`\`",
         "color": config.defaultColor,
     }
 }
@@ -76,7 +76,7 @@ client.on("message", (msg) => {
             msg.channel.send({
                 "embed": {
                     "title": "Registration stats",
-                    "description": "\`\`\`\n" + "[" + serverReg + "/" + totalUsers.size + "] Registered users in this server \n[" + accounts.length + "] Total registered users\n[" + roleQueue.length + "] Operations in the queue\`\`\`",
+                    "description": "\`\`\`\n" + "[" + serverReg + "/" + totalUsers.size + "] Registered users in this server \n[" + accounts.length + "] Total registered users\n[" + config.guilds.length + "] Total registered guilds\n[" + roleQueue.length + "] Operations in the queue\`\`\`",
                     "color": config.defaultColor,
                 }
             })
@@ -106,7 +106,7 @@ client.on("message", (msg) => {
             }
             break;
 
-        case "linkrole":
+        case "roleadd":
             if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.reply("sorry, only the server staff can use this"); return; }
             if (args.length !== 3) {//show help message if args are wrong
                 msg.channel.send({
@@ -147,7 +147,7 @@ client.on("message", (msg) => {
             }
             break;
 
-        case "unlinkrole":
+        case "roleremove":
             if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.reply("sorry, only the server staff can use this"); return; }
             if (args.length === 0) {//show help message
                 msg.channel.send({
@@ -189,7 +189,7 @@ client.on("message", (msg) => {
             }
             break;
 
-        case "rolelinks"://this command keeps crashing the bot
+        case "roles"://this command keeps crashing the bot
             let guilds = config.guilds.filter(g => Object.getOwnPropertyNames(g.links).includes(msg.guild.id))//find all the guilds tied to this server
             let collected = []
             //create a list of configured roles for this server
