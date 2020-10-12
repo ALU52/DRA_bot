@@ -77,29 +77,31 @@ function checkUpdates() {
             })
         })
     })
-    if (needsRestart) {
-        if (!bot) return;//when the bot hasn't started yet
-        log('INFO', "Looks like a restart is needed. Sending shutdown message to the bot...")
-        bot.kill()//tells it to stop and waits until it exits
-        bot.once('close', () => {//not sure if this is any different from 'exit'
-            log('INFO', "Parent detected bot shutdown - starting it back up to apply updates")
-            bot.removeAllListeners()
-            bot = null;
-            setTimeout(() => {
-                needsRestart = false;
-                bot = child.fork("./app.js")//wait a bit and start it back up
-                //add listeners again
-                bot.on('disconnect', () => {
-                    if (needsRestart) return; //ignore if its restarting
-                    log('WARN', "The parent lost connection to the bot! Updates have been disabled.")
-                    clearInterval(updater)
-                })
-                bot.on('error', (err) => {
-                    log('ERR', `Seems like the bot has crashed. ${err.name}: ${err.message}: ${err.stack}`)
-                })
-            }, 1000);
-        })
-    }
+    setTimeout(() => {//waits for everything to finish downloading or whatever
+        if (needsRestart) {
+            if (!bot) return;//when the bot hasn't started yet
+            log('INFO', "Looks like a restart is needed. Sending shutdown message to the bot...")
+            bot.kill()//tells it to stop and waits until it exits
+            bot.once('close', () => {//not sure if this is any different from 'exit'
+                log('INFO', "Parent detected bot shutdown - starting it back up to apply updates")
+                bot.removeAllListeners()
+                bot = null;
+                setTimeout(() => {
+                    needsRestart = false;
+                    bot = child.fork("./app.js")//wait a bit and start it back up
+                    //add listeners again
+                    bot.on('disconnect', () => {
+                        if (needsRestart) return; //ignore if its restarting
+                        log('WARN', "The parent lost connection to the bot! Updates have been disabled.")
+                        clearInterval(updater)
+                    })
+                    bot.on('error', (err) => {
+                        log('ERR', `Seems like the bot has crashed. ${err.name}: ${err.message}: ${err.stack}`)
+                    })
+                }, 1000);
+            })
+        }
+    }, 3000);
 }
 
 /**
