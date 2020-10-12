@@ -8,7 +8,7 @@ var waitList = new Set();
 var roleQueue = []
 
 const client = new Discord.Client();
-const colors = { "success": 8311585, "error": 15609652, "warning": "#f0a000" }
+const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000" }
 
 //makes sure the server settings are up to date
 setTimeout(() => {//gives it a moment for the cache
@@ -70,7 +70,7 @@ client.on("message", (msg) => {
         msg.channel.send({
             "embed": {
                 "description": "👋 Hey there! My prefix is `" + config.prefix + "` Use `" + config.prefix + "help` to see a list of commands",
-                "color": 8311585
+                "color": config.defaultColor
             }
         })
     }
