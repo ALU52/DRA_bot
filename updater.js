@@ -3,7 +3,7 @@ const fs = require('fs')
 const child = require('child_process')
 const { ReactionUserManager } = require('discord.js')
 const homeURL = "https://raw.githubusercontent.com/ALU52/GwA-Bot/master/"
-const ignore = ["updater.js", "config.json", "app.log", "node_modules", "accounts.json", ".git"]
+const ignore = ["config.json", "app.log", "node_modules", "accounts.json", ".git"]
 const files = fs.readdirSync("./").filter(f => !ignore.includes(f)).filter(f => !f.includes(".bak"))
 
 //github is always right
