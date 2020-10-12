@@ -69,6 +69,7 @@ function checkUpdates() {
 }
 
 function restart() {
+    if (!needsRestart) return;//never needed a restart
     log('INFO', "Looks like a restart is needed. Sending shutdown message to the bot...")
     bot.kill()//tells it to stop and waits until it exits
     bot.once('close', () => {//not sure if this is any different from 'exit'
