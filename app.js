@@ -278,7 +278,9 @@ client.on("message", (msg) => {
             let rupdatedRanks = 0;
             let raddedRanks = 0
             let rreport = ""
+            let link = accounts.find(a => a.id == msg.author.id)
             //builds a report so the guild owners know it worked
+            if (!link) { msg.reply('you need to link your account before this can work'); return }
             //the rest is not implemented yet //////////////////
             break;
 
