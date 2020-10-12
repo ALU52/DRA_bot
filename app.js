@@ -10,6 +10,31 @@ var roleQueue = []
 const client = new Discord.Client();
 const colors = { "success": 8311585, "error": 15609652 }
 
+//makes sure the server settings are up to date
+setTimeout(() => {//gives it a moment for the cache
+    let map = Object.getOwnPropertyNames(config.serverSettings)
+    client.guilds.cache.forEach(g => {
+        if (!map.includes(g.id)) {//if its not there
+            log('INFO', `Adding settings for ${g.id}`)
+            config.serverSettings[g.id] = { "unregisteredRole": null }//add blank settings
+        }
+    })
+}, 1000);
+client.on('guildCreate', (g) => {
+    config.serverSettings[g.id] = { "unregisteredRole": null }//sets to empty settings
+})
+client.on('guildMemberAdd', (member) => {
+    let serverSettings = config.serverSettings[member.guild.id]
+    if (serverSettings.unregisteredRole != null) {//unregistered role is enabled, fetch it
+        member.guild.roles.fetch(serverSettings.unregisteredRole).then(r => {//I keep forgetting that roles.fetch() is async
+            if (!role) { log('ERR', `Tried to give an unregistered role, but it seems like ${role.id} doesn't exist `); return; }
+            if (!member.manageable) { log('ERR', `I don't have permissions to manage${member.id} in ${member.guild.id}`); return; }
+            member.roles.add(role)//so help me god if this throws errors
+        })
+    }
+})
+
+
 //#region Embeds
 var helpEmbed = {
     "embed": {
