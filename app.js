@@ -8,7 +8,7 @@ var waitList = new Set();
 var roleQueue = []
 
 const client = new Discord.Client();
-const colors = { "success": 8311585, "error": 15609652 }
+const colors = { "success": 8311585, "error": 15609652, "warning": "#f0a000" }
 
 //makes sure the server settings are up to date
 setTimeout(() => {//gives it a moment for the cache
@@ -123,7 +123,7 @@ client.on("message", (msg) => {
                 msg.channel.send({
                     "embed": {
                         "description": "✅ Your account was unlinked",
-                        "color": 8311585
+                        "color": colors.success
                     }
                 })
             } else {
@@ -137,7 +137,7 @@ client.on("message", (msg) => {
                 msg.channel.send({
                     "embed": {
                         "description": "This command links a role to a guild to be assigned automatically\n**Usage:** roleAdd <roleID> <rank> <guildTag>\nThe rank should be a number 1-9. The rank number depends on the order in the guild. 0 will be given to every member of the guild. Otherwise, they increase with the highest rank (e.g. the leader) being #1. With the exception of #0, the highest rank = the lowest #, with the lowest rank = the highest #",
-                        "color": 8311585
+                        "color": config.defaultColor
                     }
                 })
                 return;
@@ -160,7 +160,7 @@ client.on("message", (msg) => {
                         msg.channel.send({
                             "embed": {
                                 "description": "✅ Link successful",
-                                "color": 8311585
+                                "color": colors.success
                             }
                         })
                     } else {
@@ -178,7 +178,7 @@ client.on("message", (msg) => {
                 msg.channel.send({
                     "embed": {
                         "description": "This command unlinks a role from a guild\nUsage: unlink <roleID>",
-                        "color": 8311585
+                        "color": config.defaultColor
                     }
                 })
             } else {//looks like this part needs to be re-written too
@@ -207,7 +207,7 @@ client.on("message", (msg) => {
                     msg.channel.send({
                         "embed": {
                             "description": "❌ Failed to unlink this role, check `rolelinks`, It might not exist",
-                            "color": 15609652
+                            "color": colors.error
                         }
                     })
                 }
@@ -348,7 +348,7 @@ const queueManager = setInterval(() => {
                         "embed": {
                             "embed": {
                                 "description": "❌ Something went wrong when I checked your Gw2 account! It's likely that the API key was deleted\nTo avoid spamming the API, your account was automatically unlinked",
-                                "color": 15609652
+                                "color": colors.error
                             }
                         }
                     })
@@ -398,7 +398,7 @@ function handleWaitResponse(user, content) {
             user.send({
                 "embed": {
                     "description": "❌ There was an error during setup. Did you provide a valid API key? Please DM <@" + config.owner.id + "> if you'd like help",
-                    "color": 15609652
+                    "color": colors.error
                 }
             })
             return;
@@ -408,7 +408,7 @@ function handleWaitResponse(user, content) {
         user.send({
             "embed": {
                 "description": "✅ Your account was linked successfully",
-                "color": 8311585
+                "color": colors.success
             }
         })
     })
@@ -585,7 +585,7 @@ function apiFetch(path, token) {
  */
 function prompt(who, channel, text) {
     return new Promise(function (resolve) {
-        let embed = { "embed": { "description": text, "color": "#f0a000" } }
+        let embed = { "embed": { "description": text, "color": colors.warning } }
         channel.send(embed).then(m => m.react(`✅`)).then(m => m.message.react(`❌`)).then(m => {//add the reactions
             let filter = (reaction, user) => {
                 return ['✅', '❌'].includes(reaction.emoji.name) && user.id === who.id;
