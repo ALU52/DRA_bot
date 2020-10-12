@@ -7,7 +7,7 @@ const ignore = ["config.json", "app.log", "node_modules", "accounts.json", ".git
 const files = fs.readdirSync("./").filter(f => !ignore.includes(f)).filter(f => !f.includes(".bak"))
 
 //github is always right
-const bot = child.fork("./app.js")
+var bot = child.fork("./app.js")
 let needsRestart = false;
 
 log('WARN', "Cold start detected")
