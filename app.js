@@ -111,7 +111,7 @@ client.on("message", (msg) => {
             if (args.length !== 3) {//show help message if args are wrong
                 msg.channel.send({
                     "embed": {
-                        "description": "This command links a role to a guild to be assigned automatically\n**Usage:** linkRole <roleID> <rank> <guildTag>\nThe rank should be a number 1-9. The rank number depends on the order in the guild. 0 will be given to every member of the guild. Otherwise, they increase, with the highest rank being first. E.g. The leader = 1",
+                        "description": "This command links a role to a guild to be assigned automatically\n**Usage:** roleAdd <roleID> <rank> <guildTag>\nThe rank should be a number 1-9. The rank number depends on the order in the guild. 0 will be given to every member of the guild. Otherwise, they increase with the highest rank (e.g. the leader) being #1. With the exception of #0, the highest rank = the lowest #, with the lowest rank = the highest #",
                         "color": 8311585
                     }
                 })
