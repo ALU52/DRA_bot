@@ -282,10 +282,15 @@ client.on("message", (msg) => {
             //the rest is not implemented yet //////////////////
             break;
 
-        case "debug":
+        case "guild":
             //returns a raw guild so all the data can be seen
             let g = JSON.stringify(searchGuilds(args[0]))
             msg.channel.send("```json\n" + g + "```")
+            break;
+
+        case "server":
+            let s = JSON.stringify(config.serverSettings[msg.guild.id])
+            msg.channel.send("```json\n" + s + "```")
             break;
 
         default:
@@ -492,6 +497,7 @@ function newGuild(id, key, owner) {
  * @param {string} string The string to process
  */
 function normalizeString(string) {
+    if (!string) return;
     let result = ''
     let key = Object.getOwnPropertyNames(characterMap)
     string.split('').forEach(l => {
