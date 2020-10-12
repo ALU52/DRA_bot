@@ -23,12 +23,8 @@ setTimeout(() => {//gives it a chance to update before starting
         log('WARN', "The parent lost connection to the bot! Updates have been disabled.")
         clearInterval(updater)
     })
-
     bot.on('error', (err) => {
         log('ERR', `Seems like the bot has crashed. ${err.name}: ${err.message}: ${err.stack}`)
-    })
-    process.on('uncaughtException', (err) => {
-        log('ERR', `Uncaught exception for the parent. ${err.name}: ${err.message}: ${err.stack}`)
     })
 }, 3000);
 
@@ -92,6 +88,15 @@ function checkUpdates() {
             setTimeout(() => {
                 needsRestart = false;
                 bot = child.fork("./app.js")//wait a bit and start it back up
+                //add listeners again
+                bot.on('disconnect', () => {
+                    if (needsRestart) return; //ignore if its restarting
+                    log('WARN', "The parent lost connection to the bot! Updates have been disabled.")
+                    clearInterval(updater)
+                })
+                bot.on('error', (err) => {
+                    log('ERR', `Seems like the bot has crashed. ${err.name}: ${err.message}: ${err.stack}`)
+                })
             }, 1000);
         })
     }
@@ -110,3 +115,7 @@ function log(type, message) {
         fs.writeFileSync("./app.log", string)
     }
 }
+
+process.on('uncaughtException', (err) => {
+    log('ERR', `Uncaught exception for the parent. ${err.name}: ${err.message}: ${err.stack}`)
+})
