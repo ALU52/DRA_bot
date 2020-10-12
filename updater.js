@@ -1,13 +1,14 @@
 const https = require('https')
 const fs = require('fs')
 const child = require('child_process')
+const { ReactionUserManager } = require('discord.js')
 const homeURL = "https://raw.githubusercontent.com/ALU52/GwA-Bot/master/"
 const ignore = ["updater.js", "config.json", "app.log", "node_modules", "accounts.json", ".git"]
 const files = fs.readdirSync("./").filter(f => !ignore.includes(f)).filter(f => !f.includes(".bak"))
 
 //github is always right
 const bot = child.fork("./app.js")
-let needsRestart
+let needsRestart = false;
 
 log('WARN', "Cold start detected")
 checkUpdates()//checks at startup
@@ -16,7 +17,6 @@ let updater = setInterval(() => {
 }, 3.6e+6);//checks for updates every hour
 
 function checkUpdates() {
-    needsRestart = false;
     files.forEach(f => {//for each file not on the ignore list
         //backup the file first
         try {
@@ -68,11 +68,13 @@ function checkUpdates() {
 }
 
 function restart() {
-    needsRestart = false;
     log('INFO', "Looks like a restart is needed. Sending shutdown message to the bot...")
-    bot.send("shutdown")//tells it to stop and waits until it exits
+    bot.kill()//tells it to stop and waits until it exits
     bot.once('close', (c) => {//not sure if this is any different from 'exit'
         log('INFO', "Parent detected bot shutdown - starting it back up to apply updates")
+        needsRestart = false;
+        bot.removeAllListeners()
+        bot = null;
         if (c == 0) {//makes sure its a 0 exit code so it didn't just crash
             setTimeout(() => {
                 bot = child.fork("./app.js")//wait a bit and start it back up
