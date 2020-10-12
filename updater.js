@@ -7,14 +7,30 @@ const ignore = ["config.json", "app.log", "node_modules", "accounts.json", ".git
 const files = fs.readdirSync("./").filter(f => !ignore.includes(f)).filter(f => !f.includes(".bak"))
 
 //github is always right
-var bot = child.fork("./app.js")
 let needsRestart = false;
+var bot;
 
 log('WARN', "Cold start detected")
 checkUpdates()//checks at startup
 let updater = setInterval(() => {
     checkUpdates()
-}, 3.6e+6);//checks for updates every hour
+}, 3.6e+6);//checks for updates every hour (3.6e+6)
+
+setTimeout(() => {//gives it a chance to update before starting
+    bot = child.fork("./app.js")
+    bot.on('disconnect', () => {
+        if (needsRestart) return; //ignore if its restarting
+        log('WARN', "The parent lost connection to the bot! Updates have been disabled.")
+        clearInterval(updater)
+    })
+
+    bot.on('error', (err) => {
+        log('ERR', `Seems like the bot has crashed. ${err.name}: ${err.message}: ${err.stack}`)
+    })
+    process.on('uncaughtException', (err) => {
+        log('ERR', `Uncaught exception for the parent. ${err.name}: ${err.message}: ${err.stack}`)
+    })
+}, 3000);
 
 function checkUpdates() {
     log('INFO', "Checking for updates")
@@ -65,39 +81,21 @@ function checkUpdates() {
             })
         })
     })
-    if (needsRestart) restart()
+    if (needsRestart) {
+        if (!bot) return;//when the bot hasn't started yet
+        log('INFO', "Looks like a restart is needed. Sending shutdown message to the bot...")
+        bot.kill()//tells it to stop and waits until it exits
+        bot.once('close', () => {//not sure if this is any different from 'exit'
+            log('INFO', "Parent detected bot shutdown - starting it back up to apply updates")
+            bot.removeAllListeners()
+            bot = null;
+            setTimeout(() => {
+                needsRestart = false;
+                bot = child.fork("./app.js")//wait a bit and start it back up
+            }, 1000);
+        })
+    }
 }
-
-function restart() {
-    if (!needsRestart) return;//never needed a restart
-    log('INFO', "Looks like a restart is needed. Sending shutdown message to the bot...")
-    bot.kill()//tells it to stop and waits until it exits
-    bot.once('close', () => {//not sure if this is any different from 'exit'
-        log('INFO', "Parent detected bot shutdown - starting it back up to apply updates")
-        needsRestart = false;
-        bot.unref()
-        bot.removeAllListeners()
-        bot = null;
-        setTimeout(() => {
-            bot = child.fork("./app.js")//wait a bit and start it back up
-        }, 1000);
-
-    })
-}
-
-bot.on('disconnect', () => {
-    if (needsRestart) return; //ignore if its restarting
-    log('WARN', "The parent lost connection to the bot! Updates have been disabled.")
-    clearInterval(updater)
-})
-
-bot.on('error', (err) => {
-    log('ERR', `Seems like the bot has crashed. ${err.name}: ${err.message}: ${err.stack}`)
-})
-process.on('uncaughtException', (err) => {
-    log('ERR', `Uncaught exception for the parent. ${err.name}: ${err.message}: ${err.stack}`)
-})
-
 
 /**
  * Logs an event
