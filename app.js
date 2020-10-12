@@ -259,8 +259,8 @@ client.on("message", (msg) => {
 
         case "debug":
             //returns a raw guild so all the data can be seen
-            let g = searchGuilds(args[0])
-            msg.channel.send("```json\n" + JSON.stringify(g) + "```")
+            let g = JSON.stringify(searchGuilds(args[0]))
+            msg.channel.send("```json\n" + g + "```")
             break;
 
         default:
