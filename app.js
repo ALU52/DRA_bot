@@ -303,9 +303,9 @@ client.on("message", (msg) => {
         case "time":
             if (!args[0]) { msg.reply("please supply a timestamp to translate"); return }
             let num = args[0] * 1
-            if (num == NaN) { msg.reply("the timestamp should be in milliseconds since Jan 1, 1970"); return; } else {
-                msg.reply(timeDifference(args[0]))
-            }
+            if (num == NaN) { msg.reply("the timestamp should be in milliseconds since Jan 1, 1970"); return; }
+            if (num >= Date.now()) { msg.reply("this tool is for reading *past* timestamps, not the future"); return; }
+            msg.reply(timeDifference(args[0]))
             break;
 
         default:
