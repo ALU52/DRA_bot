@@ -76,7 +76,7 @@ client.on("message", (msg) => {
     }
     if (waitList.has(msg.author.id)) { handleWaitResponse(msg.author, msg.content); return }
     //ignores bots, DMs, people on blacklist, and anything not starting with the prefix
-    if (msg.author.bot || msg.channel.type === "dm" || !msg.content.startsWith(config.prefix) || config.blacklist.includes(msg.author.id)) return;
+    if (msg.author.bot || !msg.content.startsWith(config.prefix) || config.blacklist.includes(msg.author.id)) return;
 
     let messageArray = msg.content.split(" ")
     let cmd = messageArray[0].substring(config.prefix.length).toLowerCase();
@@ -132,6 +132,7 @@ client.on("message", (msg) => {
             break;
 
         case "roleadd":
+            if (msg.channel.type == "dm") { msg.reply("this command can only be used in servers"); return; }
             if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.reply("sorry, only the server staff can use this"); return; }
             if (args.length !== 3) {//show help message if args are wrong
                 msg.channel.send({
@@ -173,6 +174,7 @@ client.on("message", (msg) => {
             break;
 
         case "roleremove":
+            if (msg.channel.type == "dm") { msg.reply("this command can only be used in servers"); return; }
             if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.reply("sorry, only the server staff can use this"); return; }
             if (args.length === 0) {//show help message
                 msg.channel.send({
@@ -215,6 +217,7 @@ client.on("message", (msg) => {
             break;
 
         case "roles"://this command keeps crashing the bot
+            if (msg.channel.type == "dm") { msg.reply("this command can only be used in servers"); return; }
             let guilds = config.guilds.filter(g => Object.getOwnPropertyNames(g.links).includes(msg.guild.id))//find all the guilds tied to this server
             let collected = []
             //create a list of configured roles for this server
@@ -246,7 +249,7 @@ client.on("message", (msg) => {
             break;
 
         case "log":
-            if (args[0] == "clear" && msg.author.id == config.owner.id) { fs.writeFileSync(config.logPath, `\n[INFO](${Date.now()}) The log was cleared`); return; }
+            if (args[0] == "clear" && msg.author.id == config.owner.id) { fs.writeFileSync(config.logPath, `\n[INFO](${Date.now()}) - The log was cleared`); return; }
             let lstring = ""//this command is broken, it seems to crash the program, or completely skip the counting part
             let lmaxLines = 20
             let llog = fs.readFileSync(config.logPath).toString().split("\n")
@@ -292,6 +295,7 @@ client.on("message", (msg) => {
             break;
 
         case "server":
+            if (msg.channel.type == "dm") { msg.reply("this command can only be used in servers"); return; }
             let s = JSON.stringify(config.serverSettings[msg.guild.id])
             msg.channel.send("```json\n" + s + "```")
             break;
