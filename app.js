@@ -246,6 +246,7 @@ client.on("message", (msg) => {
             break;
 
         case "log":
+            if (args[0] == "clear" && msg.author.id == config.owner.id) { fs.writeFileSync(config.logPath, `\n[INFO](${Date.now()}) The log was cleared`); return; }
             let lstring = ""//this command is broken, it seems to crash the program, or completely skip the counting part
             let lmaxLines = 20
             let llog = fs.readFileSync(config.logPath).toString().split("\n")

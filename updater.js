@@ -29,7 +29,6 @@ setTimeout(() => {//gives it a chance to update before starting
 }, 3000);
 
 function checkUpdates() {
-    log('INFO', "Checking for updates")
     files.forEach(f => {//for each file not on the ignore list
         //backup the file first
         try {
@@ -54,7 +53,7 @@ function checkUpdates() {
                         log('INFO', `GitHub has a different version of ${f} - overwriting...`)
                         fs.writeFile(`./${f}`, data, (err) => {
                             if (fs.statSync(`./${f}`).size > 0 && !err) {//checks for errors
-                                log(`INFO`, `Update successful`)
+                                log(`INFO`, `Done`)
                                 needsRestart = true;
                                 fs.unlinkSync(`./${f}.bak`)
                                 return;
@@ -77,13 +76,14 @@ function checkUpdates() {
             })
         })
     })
+    //so much async crap in here. I just need to replace some files lol
     setTimeout(() => {//waits for everything to finish downloading or whatever
         if (needsRestart) {
             if (!bot) return;//when the bot hasn't started yet
-            log('INFO', "Looks like a restart is needed. Sending shutdown message to the bot...")
+            log('INFO', "Restart pending - Sending shutdown message to bot...")
             bot.kill()//tells it to stop and waits until it exits
             bot.once('close', () => {//not sure if this is any different from 'exit'
-                log('INFO', "Parent detected bot shutdown - starting it back up to apply updates")
+                log('INFO', "Parent detected bot shutdown - Restarting...")
                 bot.removeAllListeners()
                 bot = null;
                 setTimeout(() => {
