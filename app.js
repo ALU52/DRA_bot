@@ -300,7 +300,7 @@ client.on("message", (msg) => {
             msg.channel.send("```json\n" + s + "```")
             break;
 
-        case "timestamp":
+        case "time":
             if (!args[0]) { msg.reply("please supply a timestamp to translate"); return }
             let num = args[0] * 1
             if (num == NaN) { msg.reply("the timestamp should be in milliseconds since Jan 1, 1970"); return; } else {
