@@ -14,7 +14,7 @@ log('WARN', "Cold start detected")
 checkUpdates()//checks at startup
 let updater = setInterval(() => {
     checkUpdates()
-}, 3.6e+6);//checks for updates every hour (3.6e+6)
+}, 600000);//checks for updates every hour (3.6e+6)
 
 setTimeout(() => {//gives it a chance to update before starting
     bot = child.fork("./app.js")
