@@ -1,6 +1,6 @@
 # GwA-Bot
 ##### Official name still TBD
-![](https://cdn.discordapp.com/app-icons/763982717846159370/a4f6a991d54f7154db35886439ab1451.png?size=256)
+![Bot Icon](https://cdn.discordapp.com/app-icons/763982717846159370/a4f6a991d54f7154db35886439ab1451.png?size=256)
 
 Discord bot designed for private use.
 
