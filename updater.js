@@ -14,7 +14,7 @@ log('WARN', "Cold start detected")
 checkUpdates()//checks at startup
 let updater = setInterval(() => {
     checkUpdates()
-}, 600000);//checks for updates every hour (3.6e+6)
+}, 600000);// (3.6e+6)
 
 setTimeout(() => {//gives it a chance to update before starting
     bot = child.fork("./app.js")
@@ -53,6 +53,7 @@ function checkUpdates() {
                         log('INFO', `GitHub has a different version of ${f} - overwriting...`)
                         fs.writeFile(`./${f}`, data, (err) => {
                             if (fs.statSync(`./${f}`).size > 0 && !err) {//checks for errors
+                                if (f == "updater.js") log('WARN', "Changes made to updater will not take effect until manually restarted")
                                 log(`INFO`, `Done`)
                                 needsRestart = true;
                                 fs.unlinkSync(`./${f}.bak`)
@@ -73,6 +74,9 @@ function checkUpdates() {
                         })
                     }
                 }
+            })
+            res.on('error', (err) => {
+                log('ERR', `Error while fetching updates: ${err.message}`)
             })
         })
     })
@@ -118,6 +122,8 @@ function log(type, message) {
     }
 }
 
+let conFail = 0;
 process.on('uncaughtException', (err) => {
+    if (err.code == "ENOTFOUND" && conFail <= 10) { conFail++; return; }//only starts logging failed connections after the 10th occurrence
     log('ERR', `Uncaught exception for the parent. ${err.name}: ${err.message}: ${err.stack}`)
 })
