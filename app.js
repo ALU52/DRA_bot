@@ -10,6 +10,8 @@ var roleQueue = []
 const client = new Discord.Client();
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000" }
 
+if (!config.cacheTime) config.cacheTime = 8.64e+7//this is only for an update
+
 //makes sure the server settings are up to date
 setTimeout(() => {//gives it a moment for the cache
     let map = Object.getOwnPropertyNames(config.serverSettings)
@@ -236,7 +238,11 @@ client.on("message", (msg) => {
             let codeBlock = ""//the string to build for the embed
             if (collected.length == 0) codeBlock = "```No links were found in this server```"; else {
                 collected.forEach(l => {
-                    codeBlock += `\n> [Rank:${l.rank}] <@&${l.role}> => ${l.name}`
+                    if (l.rank == 0) {
+                        codeBlock += `\n> [Everyone] <@&${l.role}> => ${l.name}`
+                    } else {
+                        codeBlock += `\n> [Rank:${l.rank}] <@&${l.role}> => ${l.name}`
+                    }
                 })
             }
             msg.channel.send({//send the embed after the code block gets built
@@ -330,38 +336,46 @@ const queAdder = setInterval(() => {//adds every account to the update que every
 //this is to avoid making the APIs angry with me
 let queueDelay = 1200
 const queueManager = setInterval(() => {
-    //also updates the accounts
-    //make sure to log failures
     if (roleQueue.length >= 1) {//only run if theres someone there
         let user = roleQueue[0]
+        if (!user.guild.me.hasPermission('MANAGE_ROLES')) { log('ERR', `I don't have permission to manage roles in ${user.guild.id}`); roleQueue.splice(0); return; }//always splice before return
         console.log(`Checking ${user.user.tag}`)
-        let link = accounts.find(a => a.id === user.id)
-        //first check if they're registered
-        if (link) {
-            //linked, now find which guilds they're in
+        let account = accounts.find(a => a.id === user.id)
+        if (account) {//first check if they're registered
+            //linked, now use the cache or update it if needed
             try {
-                apiFetch('account', link.key).then(r => {//fetches guilds the user is in, and finds the needed roles
-                    if (!r.guilds) { log('ERR', `Expected API to respond with guilds, instead got ${r}`); return; }
-                    r.guilds.forEach(g => {
-                        let internalGuild = config.guilds.find(i => i.id == g)//fetch the internal guild from the ID
-                        if (internalGuild) {//if it exists?
-                            if (Object.getOwnPropertyNames(internalGuild.links).length >= 1) {//if servers are associated with the guild
-
-
-                                //NEEDS TO BE REWRITTEN
-                                ////////////////////////////
-
-
-
+                if ((Date.now() - account.time) > config.cacheTime) {//outdated cache - update it and run the que on this account again
+                    apiFetch('account', key).then(r => {//copied from handlewaitresponse()
+                        accounts.push({ "id": user.id, "guilds": r.guilds, "time": Date.now(), "key": content })//add them to the account file
+                        r.guilds.forEach(g => {//callback for each guild the user is in
+                            if (config.guilds.find(i => i.id == g)) return//ignores guilds it already knows about
+                            else {
+                                newGuild(g, key, r.guild_leader.includes(g))//passes true to the function if they own the server
                             }
-                        } else {//found unregistered guild somehow, add it
-                            newGuild(g, link.key)
+                        })
+                    })
+                    //use return so splice is skipped and que runs this account again, with cache this time, because I'm lazy...
+                    return;
+                } else {//nah, the cache is still valid
+                    account.guilds.forEach(g => {//for each cached guild from this account
+                        let guild = config.guilds.find(cg => cg.id == g)//first find the guild in the config
+                        if (guild.links[user.guild.id]) {//if the guild has a link to the server
+                            guild.links[user.guild.id].forEach(l => {
+                                if (l.rank == 0) {//automatically assign rank 0 because everybody gets them
+                                    if (user.roles.cache.has(l.role)) return; //ignore if they already have it
+                                    user.roles.add(l.role)
+                                }
+                                //
+                                // - Under construction - this next part will search for the guild ranks and assign them if needed
+                                //
+                            })
                         }
                     })
-                })
-            } catch (err) {//failed to fetch guilds
+                }
+            } catch (err) {//unlink on uncaught error
+                //massive error scope because lots could go wrong in the part above
                 log('ERR', `Failed to fetch guilds for ${user.id}! Unlinking their account`)
-                client.users.fetch(link.id).then(u => {//let the user know there was an error and their account has been unlinked
+                client.users.fetch(account.id).then(u => {//let the user know there was an error and their account has been unlinked
                     let acc = accounts.findIndex(a => a.id == msg.author.id)
                     accounts.splice(acc)
                     u.send({
