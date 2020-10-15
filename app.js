@@ -235,20 +235,20 @@ client.on("message", (msg) => {
                     }
                 })
             })
-            let codeBlock = ""//the string to build for the embed
-            if (collected.length == 0) codeBlock = "```No links were found in this server```"; else {
+            let linkBlock = ""//the string to build for the embed
+            if (collected.length == 0) linkBlock = "```No links were found in this server```"; else {
                 collected.forEach(l => {
                     if (l.rank == 0) {
-                        codeBlock += `\n> [Everyone] <@&${l.role}> => ${l.name}`
+                        linkBlock += `\n> ${l.name} [Everyone] => <@&${l.role}>`
                     } else {
-                        codeBlock += `\n> [Rank:${l.rank}] <@&${l.role}> => ${l.name}`
+                        linkBlock += `\n> ${l.name} [Rank: ${l.rank}] => <@&${l.role}>`
                     }
                 })
             }
             msg.channel.send({//send the embed after the code block gets built
                 "embed": {
                     "title": "Linked roles",
-                    "description": "Roles and the guilds they're linked to:" + codeBlock,
+                    "description": "Guild | Rank | And the role it's linked to" + linkBlock,
                     "color": config.defaultColor,
                 }
             })
@@ -312,6 +312,12 @@ client.on("message", (msg) => {
             if (num == NaN) { msg.reply("the timestamp should be in milliseconds since Jan 1, 1970"); return; }
             if (num >= Date.now()) { msg.reply("this tool is for reading *past* timestamps, not the future"); return; }
             msg.reply(timeDifference(args[0]))
+            break;
+
+        case "set":
+            //under construction
+            //this command is for other server-specific settings, as stored in config
+            //will allow an "unregistered" role to be automatically given to anybody who hasn't linked their account, among other things
             break;
 
         default:
