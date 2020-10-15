@@ -374,14 +374,14 @@ const queueManager = setInterval(() => {
                 }
             } catch (err) {//unlink on uncaught error
                 //massive error scope because lots could go wrong in the part above
-                log('ERR', `Failed to fetch guilds for ${user.id}! Unlinking their account`)
+                log(`ERR`, `Error while checking ${user.id}, unlinked their account. \n${err}`)
                 client.users.fetch(account.id).then(u => {//let the user know there was an error and their account has been unlinked
                     let acc = accounts.findIndex(a => a.id == msg.author.id)
                     accounts.splice(acc)
                     u.send({
                         "embed": {
                             "embed": {
-                                "description": "❌ Something went wrong when I checked your Gw2 account! It's likely that the API key was deleted\nTo avoid spamming the API, your account was automatically unlinked",
+                                "description": "❌ Something went wrong when I checked your Gw2 account! It's likely that the linked API key was deleted.\nTo avoid spamming the API, your account was automatically unlinked",
                                 "color": colors.error
                             }
                         }
@@ -403,7 +403,7 @@ setInterval(() => {//saves the accounts to the file every 5 seconds
 //#endregion
 
 //login after defining the events
-client.login(config.token)
+client.login(config.token).catch(e => log('ERR', `Failed to login. Who's letting the Wi-Fi out?!\n${e}`))
 
 //#region Functions
 /**
