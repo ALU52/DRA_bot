@@ -404,8 +404,8 @@ function handleWaitResponse(user, content) {
         try {
             if (!r.permissions.includes('guilds')) { user.send("This key is missing guild permissions. Please fix this and again."); return; }
             waitList.delete(user.id)//remove them from the waitlist
-            accounts.push({ "id": user.id, "key": content })//add them to the account file
             apiFetch('account', key).then(r => {//request for user guilds
+                accounts.push({ "id": user.id, "guilds": r.guilds, "time": Date.now(), "key": content })//add them to the account file
                 r.guilds.forEach(g => {//callback for each guild the user is in
                     if (config.guilds.find(i => i.id == g)) return//ignores guilds it already knows about
                     else {
