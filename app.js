@@ -625,7 +625,9 @@ const randomGames = [
     "Hello Neighbor",
     "Tetris",
     "with the neighbor's dog",
-    "Elite Dangerous"
+    "Elite Dangerous",
+    "Tetris 69",
+    "Left 4 Dead 2"
 ]
 //#endregion
 
@@ -764,7 +766,7 @@ client.on("ready", () => {
         ]
         client.user.setActivity(messages[ss].name, messages[ss].options)
         if (ss >= messages.length - 1) ss = 0; else ss++;
-    }, 55000);
+    }, 135000);
 });
 client.on('guildCreate', (g) => {
     config.serverSettings[g.id] = { "unregisteredRole": null }//sets to empty settings
