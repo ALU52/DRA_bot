@@ -22,20 +22,6 @@ setTimeout(() => {//gives it a moment for the cache
         }
     })
 }, 1000);
-client.on('guildCreate', (g) => {
-    config.serverSettings[g.id] = { "unregisteredRole": null }//sets to empty settings
-})
-client.on('guildMemberAdd', (member) => {
-    let serverSettings = config.serverSettings[member.guild.id]
-    if (serverSettings.unregisteredRole != null) {//unregistered role is enabled, fetch it
-        member.guild.roles.fetch(serverSettings.unregisteredRole).then(r => {//I keep forgetting that roles.fetch() is async
-            if (!role) { log('ERR', `Tried to give an unregistered role, but it seems like ${role.id} doesn't exist `); return; }
-            if (!member.manageable) { log('ERR', `I don't have permissions to manage${member.id} in ${member.guild.id}`); return; }
-            member.roles.add(role)//so help me god if this throws errors
-        })
-    }
-})
-
 
 //#region Embeds
 var helpEmbed = {
@@ -382,7 +368,7 @@ const queueManager = setInterval(() => {
                 //massive error scope because lots could go wrong in the part above
                 log(`ERR`, `Error while checking ${user.id}, unlinked their account. \n${err}`)
                 client.users.fetch(account.id).then(u => {//let the user know there was an error and their account has been unlinked
-                    let acc = accounts.findIndex(a => a.id == msg.author.id)
+                    let acc = accounts.findIndex(a => a.id == user.id)
                     accounts.splice(acc)
                     u.send({
                         "embed": {
@@ -546,6 +532,7 @@ function normalizeString(string) {
     return result
 }
 
+//#region String collections
 const characterMap = {//this is probably the worst thing I've ever created // cases are separated because I'm not sure how lenient string.includes() is
     'a': ['A', 'a', 'À', 'Á', 'Â', 'Ã', 'Ä', 'Å', 'Æ', 'æ', 'ä'],
     'b': ['B', 'b', 'ß', 'ç', 'Ć', 'ć', 'Ĉ', 'ĉ', 'Ċ', 'ċ', 'Č', 'č'],
@@ -575,6 +562,72 @@ const characterMap = {//this is probably the worst thing I've ever created // ca
     'z': ['Z', 'z', 'Ź', 'ź', 'Ż', 'ż', 'Ž', 'ž'],
     ' ': [' ']
 }
+
+const randomGames = [
+    "Foosball",
+    "Foosball Ping Pong",
+    "Hot Wheels 1943",
+    "Barbies Pong",
+    "Lego Jurassic World",
+    "Go Fish",
+    "Jenga",
+    "Solitare",
+    "Solitare",
+    "1943 Shoots and Ladders",
+    "Tetris Solitare",
+    "Poker Battle ship",
+    "Battle ship Foosball",
+    "Hot Wheels",
+    "Connect 4",
+    "1943 Lego",
+    "Tetris Battle ship",
+    "Solitare Connect 4",
+    "G.I. Joes Mario",
+    "Battle ship G.I. Joes",
+    "Go Fish G.I. Joes",
+    "Bezerk Jenga",
+    "Shoots and Ladders",
+    "Poker Shoots and Ladders",
+    "Lego Jurassic World",
+    "Nintendo Ping Pong",
+    "Mario XBox",
+    "1943 Hot Wheels",
+    "Tetris Pong",
+    "Whoopie cushion Starfox",
+    "Playstation Tetris",
+    "Playstation Poker",
+    "Jenga Nintendo",
+    "Hot Wheels Ping Pong",
+    "Battle ship Lego Jurassic World",
+    "Shoots and Ladders Lego",
+    "Cribbage Poker",
+    "Mario Mario",
+    "Jenga 1943",
+    "Monopoly Nintendo",
+    "Starfox",
+    "Sorry!",
+    "Ping Pong",
+    "DOOM",
+    "Doki Doki Literature Club",
+    "Star Wars Battlefront 2005",
+    "GTA V",
+    "Minecraft",
+    "Minecraft 2",
+    "by myself ;-;",
+    "Google Chrome",
+    "Discord bot maker",
+    "Wallpaper engine",
+    "Genshin Impact",
+    "Phasmophobia",
+    "Nintendogs",
+    "Among Us",
+    "with the wall outlet",
+    "Hello Neighbor",
+    "Tetris",
+    "with the neighbor's dog",
+    "Elite Dangerous"
+]
+//#endregion
 
 /**
  * Logs an event
@@ -697,12 +750,35 @@ function timeDifference(previous) {
 
 //#endregion
 
-//#region Operation events
+//#region Events\
+let scroller
+let ss = 0;
 client.on("ready", () => {
     console.log(`${client.user.username} is ready!`);
-    client.user.setActivity(`out for ${config.prefix}`, { 'type': "WATCHING" })
     log('INFO', "Logged in and ready to go")
+    scroller = setInterval(() => {//update the message
+        let messages = [//activities to scroll through
+            { name: `out for ${config.prefix}`, options: { 'type': "WATCHING" } },
+            { name: `over ${client.users.cache.size} users`, options: { 'type': "WATCHING" } },
+            { name: randomGames[Math.round(Math.random() * randomGames.length)], options: { 'type': "PLAYING" } }
+        ]
+        client.user.setActivity(messages[ss].name, messages[ss].options)
+        if (ss >= messages.length - 1) ss = 0; else ss++;
+    }, 55000);
 });
+client.on('guildCreate', (g) => {
+    config.serverSettings[g.id] = { "unregisteredRole": null }//sets to empty settings
+})
+client.on('guildMemberAdd', (member) => {
+    let serverSettings = config.serverSettings[member.guild.id]
+    if (serverSettings.unregisteredRole != null) {//unregistered role is enabled, fetch it
+        member.guild.roles.fetch(serverSettings.unregisteredRole).then(r => {//I keep forgetting that roles.fetch() is async
+            if (!role) { log('ERR', `Tried to give an unregistered role, but it seems like ${role.id} doesn't exist `); return; }
+            if (!member.manageable) { log('ERR', `I don't have permissions to manage${member.id} in ${member.guild.id}`); return; }
+            member.roles.add(role)//so help me god if this throws errors
+        })
+    }
+})
 client.on('disconnect', () => {
     log('ERR', `I've lost connection to the Discord API!`)
 })
