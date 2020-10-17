@@ -9,6 +9,9 @@ const files = fs.readdirSync("./").filter(f => !ignore.includes(f)).filter(f => 
 let needsRestart = false;
 var bot;
 
+//push update that allows updater to download files even if they arent in the dir
+//maybe github has a way to list the files in the repo
+
 log('WARN', "Cold start detected")
 checkUpdates()//checks at startup
 let updater = setInterval(() => {
@@ -28,54 +31,87 @@ setTimeout(() => {//gives it a chance to update before starting
 }, 3000);
 
 function checkUpdates() {
-    files.forEach(f => {//for each file not on the ignore list
-        //backup the file first
-        try {
-            fs.copyFileSync(`./${f}`, `./${f}.bak`)
-        } catch (error) {
-            log("ERR", `Error during backup of ${f} - ${error}`)
-            return;
-        }
-        let data = "";
-        https.get(homeURL + f, (res) => {//request the file from github
-            res.on('data', chunk => data += chunk)
-            res.on('end', () => {
-                if (data == "404: Not Found") {//file not stored on github, ignore it
-                    fs.unlinkSync(`./${f}.bak`)//delete the backup
+    https.get(homeURL + "manifest.json", (res) => {//request the file from github
+        res.on('data', chunk => data += chunk)
+        res.on('error', (err) => {
+            log('ERR', `Error while fetching manifest: ${err.message}`)
+        })
+        res.on('end', () => {
+            if (data == "404: Not Found") {//file not stored on github, ignore it
+                throw new Error("Manifest is missing!")
+                return;
+            }
+            //after fetching manifest
+            let manifest = JSON.parse(data).checkList
+            //first check existing files
+            files.forEach(f => {//for each file not on the ignore list
+                //backup the file first
+                try {
+                    fs.copyFileSync(`./${f}`, `./${f}.bak`)
+                } catch (error) {
+                    log("ERR", `Error during backup of ${f} - ${error}`)
                     return;
-                } else {//file found on github
-                    var file = fs.readFileSync(`./${f}`)
-                    if (file == data) {//the same thing, delete backup
-                        fs.unlinkSync(`./${f}.bak`)//delete the backup
-                        return;
-                    } else {//changes detected
-                        log('INFO', `GitHub has a different version of ${f} - overwriting...`)
-                        fs.writeFile(`./${f}`, data, (err) => {
-                            if (fs.statSync(`./${f}`).size > 0 && !err) {//checks for errors
-                                if (f == "app.js") log('WARN', "Changes made to app.js will not take effect until manually restarted")
-                                log(`INFO`, `Done`)
-                                needsRestart = true;
-                                fs.unlinkSync(`./${f}.bak`)
+                }
+                let data = "";
+                https.get(homeURL + f, (res) => {//request the file from github
+                    res.on('data', chunk => data += chunk)
+                    res.on('end', () => {
+                        if (data == "404: Not Found") {//file not stored on github, ignore it
+                            fs.unlinkSync(`./${f}.bak`)//delete the backup
+                            return;
+                        } else {//file found on github
+                            var file = fs.readFileSync(`./${f}`)
+                            if (file == data) {//the same thing, delete backup
+                                fs.unlinkSync(`./${f}.bak`)//delete the backup
                                 return;
-                            } else {//empty file, or error, restores backup
-                                log('WARN', `${f} was "updated" to an empty file! Restoring backup...`)
-                                fs.copyFile(`./${f}.bak`, `./${f}`, (err) => {
-                                    if (err) {
-                                        log(`ERR`, `Couldn't restore the backup - Something has gone horribly wrong! Shutting down for safety...`)
-                                        process.exit(1)
-                                    } else {
-                                        log('INFO', `Restoration successful`)
+                            } else {//changes detected
+                                log('INFO', `GitHub has a different version of ${f} - overwriting...`)
+                                fs.writeFile(`./${f}`, data, (err) => {
+                                    if (fs.statSync(`./${f}`).size > 0 && !err) {//checks for errors
+                                        if (f == "app.js") log('WARN', "Changes made to app.js will not take effect until manually restarted")
+                                        log(`INFO`, `Done`)
+                                        needsRestart = true;
                                         fs.unlinkSync(`./${f}.bak`)
                                         return;
+                                    } else {//empty file, or error, restores backup
+                                        log('WARN', `${f} was "updated" to an empty file! Restoring backup...`)
+                                        fs.copyFile(`./${f}.bak`, `./${f}`, (err) => {
+                                            if (err) {
+                                                log(`ERR`, `Couldn't restore the backup - Something has gone horribly wrong! Shutting down for safety...`)
+                                                process.exit(1)
+                                            } else {
+                                                log('INFO', `Restoration successful`)
+                                                fs.unlinkSync(`./${f}.bak`)
+                                                return;
+                                            }
+                                        })
                                     }
                                 })
                             }
-                        })
-                    }
-                }
+                        }
+                    })
+                    res.on('error', (err) => {
+                        log('ERR', `Error while fetching updates: ${err.message}`)
+                    })
+                })
             })
-            res.on('error', (err) => {
-                log('ERR', `Error while fetching updates: ${err.message}`)
+            //then check for files that need to be downloaded
+            manifest.forEach(f => {
+                if (!fs.existsSync(`./${f}`)) {//if its not already there
+                    https.get(homeURL + f, (res) => {//request the file from github
+                        res.on('data', chunk => data += chunk)
+                        res.on('error', (err) => {
+                            log('ERR', `Error while downloading a file: ${err.message}`)
+                        })
+                        res.on('end', () => {
+                            if (data == "404: Not Found") {//file not stored on github, ignore it
+                                log('ERR', `${f} was found on the manifest, but seems to be missing from GitHub!`)
+                                return;
+                            }
+                            fs.writeFileSync(`./${f}`, data)
+                        })
+                    })
+                }
             })
         })
     })
