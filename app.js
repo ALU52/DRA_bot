@@ -327,60 +327,60 @@ let queueDelay = 500
 const queueManager = setInterval(() => {
     if (roleQueue.length >= 1) {//only run if theres someone there
         let member = roleQueue[roleQueue.length - 1]
-        if (!member.guild.me.hasPermission('MANAGE_ROLES')) { log('ERR', `I don't have permission to manage roles in ${member.guild.id}`); roleQueue.pop(); return; }//always splice before return
         console.log(`Checking ${member.user.tag}`)
         let account = accounts.find(a => a.id === member.id)
         if (account) {//first check if they're registered
             //linked, now use the cache or update it if needed
-            try {
-                if ((Date.now() - account.time) > config.cacheTime) {//outdated cache - update it and run the que on this account again
+
+            if ((Date.now() - account.time) > config.cacheTime) {//outdated cache - update it and run the que on this account again
+                try {
                     apiFetch('account', account.key).then(r => {//copied from handlewaitresponse()
+                        //I hate how volatile these responses are
                         account.guilds = r.guilds
                         account.time = Date.now()//update account
                         r.guilds.forEach(g => {//callback for each guild the user is in
                             if (config.guilds.find(i => i.id == g)) return//ignores guilds it already knows about
                             else {
-                                newGuild(g, key, r.guild_leader.includes(g))//passes true to the function if they own the server
+                                newGuild(g, account.key, r.guild_leader.includes(g))//this line makes me scream inside
                             }
                         })
-                    }).catch((e) => {
-                        log('ERR', `Failed to update guild details for ${member.user.id}: ${e}`)
-                        roleQueue.pop()//remove from queue after its done
-                        return;
                     })
                     roleQueue.unshift(roleQueue.pop())//moves it to the back of the queue, to be run again
                     return;
-                } else {//nah, the cache is still valid
-                    account.guilds.forEach(g => {//for each cached guild from this account
-                        let guild = config.guilds.find(cg => cg.id == g)//first find the guild in the config
-                        if (guild.links[member.guild.id]) {//if the guild has a link to the server
-                            guild.links[member.guild.id].forEach(l => {
-                                if (!l || !l.rank) { roleQueue.pop(); return; }
-                                if (l.rank == 0) {//automatically assign rank 0 because everybody gets them
-                                    if (member.roles.cache.has(l.role)) { roleQueue.pop; return; } //ignore if they already have it
-                                    member.roles.add(l.role, `This user is in "${guild.name}" - adding the role linked to it`)//add the role
-                                }
-                                //
-                                // - Under construction - this next part will search for the guild ranks and assign them if needed
-                                //
-                            })
-                        }
+                } catch (err) {//unlink on uncaught error
+                    //massive error scope because lots could go wrong in the part above
+                    log(`ERR`, `Error while checking ${member.id}, unlinked their account. \n${err}`)
+                    client.users.fetch(account.id).then(u => {//let the user know there was an error and their account has been unlinked
+                        let acc = accounts.findIndex(a => a.id == member.id)
+                        accounts.splice(acc)
+                        u.send({
+                            "embed": {
+                                "description": "❌ Something went wrong when I checked your Gw2 account! It's likely the linked API key was deleted.\nTo avoid spamming the API, your account was automatically unlinked.",
+                                "color": colors.error
+                            }
+                        })
                     })
                 }
-            } catch (err) {//unlink on uncaught error
-                //massive error scope because lots could go wrong in the part above
-                log(`ERR`, `Error while checking ${member.id}, unlinked their account. \n${err}`)
-                client.users.fetch(account.id).then(u => {//let the user know there was an error and their account has been unlinked
-                    let acc = accounts.findIndex(a => a.id == member.id)
-                    accounts.splice(acc)
-                    u.send({
-                        "embed": {
-                            "description": "❌ Something went wrong when I checked your Gw2 account! It's likely that the linked API key was deleted.\nTo avoid spamming the API, your account was automatically unlinked",
-                            "color": colors.error
-                        }
-                    })
+            } else {//nah, the cache is still valid
+                account.guilds.forEach(g => {//for each cached guild from this account
+                    let guild = config.guilds.find(cg => cg.id == g)//first find the guild in the config
+                    if (guild.links[member.guild.id]) {//if the guild has a link to the server
+                        guild.links[member.guild.id].forEach(l => {
+                            if (!l || !l.rank) { roleQueue.pop(); return; }
+                            if (l.rank == 0) {//automatically assign rank 0 because everybody gets them
+                                if (member.roles.cache.has(l.role)) { roleQueue.pop; return; } //ignore if they already have it
+                                member.roles.add(l.role, `This user is in "${guild.name}" - adding the role linked to it`).catch(e => {
+                                    log('ERR', `Failed to manage ${member.id}'s roles: ${e}`)
+                                })
+                            }
+                            //
+                            // - Under construction - this next part will search for the guild ranks and assign them if needed
+                            //
+                        })
+                    }
                 })
             }
+
         } else {
             if (!config.serverSettings[member.guild.id]) return;
             if (config.serverSettings[member.guild.id].unregisteredRole != null) {
