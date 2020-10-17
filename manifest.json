@@ -1,5 +1,5 @@
 {
-    "files": [
+    "checkList": [
         "app.js",
         "bot.js",
         "manifest.json",
