@@ -409,6 +409,16 @@ client.login(config.token).catch(e => log('ERR', `Failed to login. Who's letting
  * @param {string} content The content, hopefully key supplied
  */
 function handleWaitResponse(user, content) {
+    let c = content.toLowerCase() == "cancel"
+    if (c == "cancel" || c == "nevermind" || c == "never mind" || c == "stop" || c == "no" || c == "back" || c == "wait no") {
+        user.send({
+            "embed": {
+                "description": "❌ Account link canceled",
+                "color": colors.error
+            }
+        })
+        waitList.delete(user.id)
+    }
     //this part needs to test the API key to make sure it works, and only remove them from the waitlist if it does
     //after that, assuming its valid, add it to the registration file
     let key = content.trim()
