@@ -368,7 +368,7 @@ const queueManager = setInterval(() => {
                             if (!l || l == null) { roleQueue.pop(); return; }
                             if (l.rank == 0) {//automatically assign rank 0 because everybody gets them
                                 if (member.roles.cache.has(l.role)) { roleQueue.pop; return; } //ignore if they already have it
-                                member.roles.add(l.role, `This user is in "${guild.name}" - adding the role linked to it`).catch(e => {
+                                member.roles.add(l.role, `This user is in "${guild.name}"`).catch(e => {
                                     log('ERR', `Failed to manage ${member.id}'s roles: ${e}`)
                                 })
                             }
