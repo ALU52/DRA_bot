@@ -365,7 +365,7 @@ const queueManager = setInterval(() => {
                     let guild = config.guilds.find(cg => cg.id == g)//first find the guild in the config
                     if (guild.links[member.guild.id]) {//if the guild has a link to the server
                         guild.links[member.guild.id].forEach(l => {
-                            if (!l || !l.rank) { roleQueue.pop(); return; }
+                            if (!l || l == null) { roleQueue.pop(); return; }
                             if (l.rank == 0) {//automatically assign rank 0 because everybody gets them
                                 if (member.roles.cache.has(l.role)) { roleQueue.pop; return; } //ignore if they already have it
                                 member.roles.add(l.role, `This user is in "${guild.name}" - adding the role linked to it`).catch(e => {
