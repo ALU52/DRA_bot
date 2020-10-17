@@ -328,10 +328,9 @@ const queueManager = setInterval(() => {
     if (roleQueue.length >= 1) {//only run if theres someone there
         let member = roleQueue[roleQueue.length - 1]
         console.log(`Checking ${member.user.tag}`)
-        let account = accounts.find(a => a.id === member.id)
+        let account = accounts.find(a => a.id === member.user.id)
         if (account) {//first check if they're registered
             //linked, now use the cache or update it if needed
-
             if ((Date.now() - account.time) > config.cacheTime) {//outdated cache - update it and run the que on this account again
                 try {
                     apiFetch('account', account.key).then(r => {//copied from handlewaitresponse()
