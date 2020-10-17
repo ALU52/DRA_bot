@@ -42,7 +42,7 @@ var linkHelp = {
 var setupEmbed = {
     "embed": {
         "title": "Setup guide",
-        "description": "Here's how to link your account:\`\`\`md\n1. Go to https://account.arena.net/applications\n2. How you manage your keys is up to you, but I need to see which guilds you're in for this to work\n3. Copy the API key you'd like to use, and paste it here\`\`\`\nIf you've changed your mind, you can ignore this message",
+        "description": "Here's how to link your account:\`\`\`md\n1. Go to https://account.arena.net/applications\n2. How you manage your keys is up to you, but I need to see which guilds you're in for this to work\n3. Copy the API key you'd like to use, and paste it here\`\`\`\nIf you've changed your mind, you can ignore this message or say 'cancel'",
         "color": config.defaultColor
     }
 }
@@ -327,7 +327,6 @@ let queueDelay = 500
 const queueManager = setInterval(() => {
     if (roleQueue.length >= 1) {//only run if theres someone there
         let member = roleQueue[roleQueue.length - 1]
-        console.log(`Checking ${member.user.tag}`)
         let account = accounts.find(a => a.id === member.user.id)
         if (account) {//first check if they're registered
             //linked, now use the cache or update it if needed
@@ -402,14 +401,34 @@ setInterval(() => {//saves the accounts to the file every 5 seconds
 //login after defining the events
 client.login(config.token).catch(e => log('ERR', `Failed to login. Who's letting the Wi-Fi out?!\n${e}`))
 
+var waitlistCooldown = new Set()
 //#region Functions
 /**
  * @param {Discord.User} user The user
  * @param {string} content The content, hopefully key supplied
  */
 function handleWaitResponse(user, content) {
-    let c = content.toLowerCase() == "cancel"
-    if (c == "cancel" || c == "nevermind" || c == "never mind" || c == "stop" || c == "no" || c == "back" || c == "wait no") {
+    //to avoid spamming the API through this bot
+    if (waitlistCooldown.has(user.id)) {
+        user.send({
+            "embed": {
+                "description": "❌ Please slow down!",
+                "color": colors.error
+            }
+        })
+        waitlistCooldown.add(user.id)
+        setTimeout(() => {
+            waitlistCooldown.delete(user.id)
+        }, 3000);
+        return;
+    }
+    waitlistCooldown.add(user.id)
+    setTimeout(() => {
+        waitlistCooldown.delete(user.id)
+    }, 1000);
+
+    let txt = content.toLowerCase()
+    if (txt == "cancel" || txt == "nevermind" || txt == "never mind" || txt == "stop" || txt == "no" || txt == "back" || txt == "wait no") {
         user.send({
             "embed": {
                 "description": "❌ Account link canceled",
@@ -417,34 +436,41 @@ function handleWaitResponse(user, content) {
             }
         })
         waitList.delete(user.id)
+        return;
     }
     //this part needs to test the API key to make sure it works, and only remove them from the waitlist if it does
     //after that, assuming its valid, add it to the registration file
     let key = content.trim()
-    try {
-        apiFetch('tokeninfo', key).then(r => {
-            if (!r.permissions) return;//wasn't parsed properly
-            if (!r.permissions.includes('guilds')) { user.send("This key is missing guild permissions. Please fix this and again."); return; }
+    apiFetch('tokeninfo', key).then(r => {
+        if (r.text) {
+            user.send({
+                "embed": {
+                    "description": `❌ The API replied with this:\n${r.text}`,
+                    "color": colors.error
+                }
+            })
+            return;
+        }
+        if (!r.permissions.includes('guilds')) { user.send("This key is missing guild permissions. Please fix this and again."); return; }
+        apiFetch('account', key).then(r => {//request for user guilds
+            accounts.push({ "id": user.id, "guilds": r.guilds, "time": Date.now(), "key": content })//add them to the account file
             waitList.delete(user.id)//remove them from the waitlist
-            apiFetch('account', key).then(r => {//request for user guilds
-                accounts.push({ "id": user.id, "guilds": r.guilds, "time": Date.now(), "key": content })//add them to the account file
-                r.guilds.forEach(g => {//callback for each guild the user is in
-                    if (config.guilds.find(i => i.id == g)) return//ignores guilds it already knows about
-                    else {
-                        newGuild(g, key, r.guild_leader.includes(g))//passes true to the function if they own the server
-                    }
-                })
+            r.guilds.forEach(g => {//callback for each guild the user is in
+                if (config.guilds.find(i => i.id == g)) return//ignores guilds it already knows about
+                else {
+                    newGuild(g, key, r.guild_leader.includes(g))//passes true to the function if they own the server
+                }
             })
             //send confirmation message after its done
             console.log("New link:" + user.id)
             user.send({
                 "embed": {
-                    "description": "✅ Your account was linked successfully",
+                    "description": `✅ Successfully linked <@${user.id}> to ${r.name}`,
                     "color": colors.success
                 }
             })
         })
-    } catch (err) {//catch error during setup
+    }).catch((err) => {
         log("ERR", `Failed guild setup: ${err}`)
         user.send({
             "embed": {
@@ -453,7 +479,7 @@ function handleWaitResponse(user, content) {
             }
         })
         return;
-    }
+    })
 }
 
 /**
@@ -706,19 +732,19 @@ function timeDifference(previous) {
 //#endregion
 
 //#region Events\
-let scroller
-let ss = 0;
+let scrollInterval;
+let msn = 0;
 client.on("ready", () => {
     console.log(`${client.user.username} is ready!`);
     log('INFO', "Logged in and ready to go")
-    scroller = setInterval(() => {//update the message
+    scrollInterval = setInterval(() => {//update the message
         let messages = [//activities to scroll through
-            { name: `out for ${config.prefix}`, options: { 'type': "WATCHING" } },
+            { name: `for ${config.prefix}`, options: { 'type': "LISTENING" } },
             { name: `${client.users.cache.size} users`, options: { 'type': "WATCHING" } },
             { name: `with the API`, options: { 'type': "PLAYING" } }
         ]
-        client.user.setActivity(messages[ss].name, messages[ss].options)
-        if (ss >= messages.length - 1) ss = 0; else ss++;
+        client.user.setActivity(messages[msn].name, messages[msn].options)
+        if (msn >= messages.length - 1) msn = 0; else msn++;
     }, 135000);
 });
 client.on('guildCreate', (g) => {
