@@ -88,7 +88,7 @@ client.on("message", (msg) => {
             msg.channel.send({
                 "embed": {
                     "title": "Registration stats",
-                    "description": "\`\`\`\n" + "[" + serverReg + "/" + totalUsers.size + "] Registered users in this server \n[" + accounts.length + "] Total registered users\n[" + config.guilds.length + "] Total registered guilds\n[" + roleQueue.length + "] Operations in the queue\`\`\`",
+                    "description": "\`\`\`\n" + "[" + serverReg + "/" + totalUsers.size + "] Registered users in this server \n[" + accounts.length + "] Total registered users\n[" + config.guilds.length + "] Total registered guilds\n[" + roleQueue.length + "] Users in the queue\`\`\`",
                     "color": config.defaultColor,
                 }
             })
@@ -344,6 +344,10 @@ const queueManager = setInterval(() => {
                                 newGuild(g, key, r.guild_leader.includes(g))//passes true to the function if they own the server
                             }
                         })
+                    }).catch((e) => {
+                        log('ERR', `Failed to update guild details for ${user.user.id}: ${e}`)
+                        roleQueue.splice(0)//remove from queue after its done
+                        return;
                     })
                     //use return so splice is skipped and que runs this account again, with cache this time, because I'm lazy...
                     return;
@@ -353,8 +357,8 @@ const queueManager = setInterval(() => {
                         if (guild.links[user.guild.id]) {//if the guild has a link to the server
                             guild.links[user.guild.id].forEach(l => {
                                 if (l.rank == 0) {//automatically assign rank 0 because everybody gets them
-                                    if (user.roles.cache.has(l.role)) return; //ignore if they already have it
-                                    user.roles.add(l.role)
+                                    if (user.roles.cache.has(l.role)) { roleQueue.splice(0); return; } //ignore if they already have it
+                                    user.roles.add(l.role)//add the role
                                 }
                                 //
                                 // - Under construction - this next part will search for the guild ranks and assign them if needed
