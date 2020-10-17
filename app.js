@@ -98,10 +98,11 @@ function checkUpdates() {
             //then check for files that need to be downloaded
             manifest.forEach(f => {
                 if (!fs.existsSync(`./${f}`)) {//if its not already there
+                    log('INFO', `Found ${f} on the manifest - Downloading...`)
                     https.get(homeURL + f, (res) => {//request the file from github
                         res.on('data', chunk => data += chunk)
                         res.on('error', (err) => {
-                            log('ERR', `Error while downloading a file: ${err.message}`)
+                            log('ERR', `Error while downloading: ${err.message}`)
                         })
                         res.on('end', () => {
                             if (data == "404: Not Found") {//file not stored on github, ignore it
@@ -109,6 +110,7 @@ function checkUpdates() {
                                 return;
                             }
                             fs.writeFileSync(`./${f}`, data)
+                            log('INFO', "Done")
                         })
                     })
                 }
