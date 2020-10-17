@@ -582,73 +582,6 @@ const characterMap = {//this is probably the worst thing I've ever created // ca
     'z': ['Z', 'z', 'Ź', 'ź', 'Ż', 'ż', 'Ž', 'ž'],
     ' ': [' ']
 }
-
-const randomGames = [
-    "Foosball",
-    "Foosball Ping Pong",
-    "Hot Wheels 1943",
-    "Barbies Pong",
-    "Lego Jurassic World",
-    "Go Fish",
-    "Jenga",
-    "Solitare",
-    "Solitare",
-    "1943 Shoots and Ladders",
-    "Tetris Solitare",
-    "Poker Battle ship",
-    "Battle ship Foosball",
-    "Hot Wheels",
-    "Connect 4",
-    "1943 Lego",
-    "Tetris Battle ship",
-    "Solitare Connect 4",
-    "G.I. Joes Mario",
-    "Battle ship G.I. Joes",
-    "Go Fish G.I. Joes",
-    "Bezerk Jenga",
-    "Shoots and Ladders",
-    "Poker Shoots and Ladders",
-    "Lego Jurassic World",
-    "Nintendo Ping Pong",
-    "Mario XBox",
-    "1943 Hot Wheels",
-    "Tetris Pong",
-    "Whoopie cushion Starfox",
-    "Playstation Tetris",
-    "Playstation Poker",
-    "Jenga Nintendo",
-    "Hot Wheels Ping Pong",
-    "Battle ship Lego Jurassic World",
-    "Shoots and Ladders Lego",
-    "Cribbage Poker",
-    "Mario Mario",
-    "Jenga 1943",
-    "Monopoly Nintendo",
-    "Starfox",
-    "Sorry!",
-    "Ping Pong",
-    "DOOM",
-    "Doki Doki Literature Club",
-    "Star Wars Battlefront 2005",
-    "GTA V",
-    "Minecraft",
-    "Minecraft 2",
-    "by myself ;-;",
-    "Google Chrome",
-    "Discord bot maker",
-    "Wallpaper engine",
-    "Genshin Impact",
-    "Phasmophobia",
-    "Nintendogs",
-    "Among Us",
-    "with the wall outlet",
-    "Hello Neighbor",
-    "Tetris",
-    "with the neighbor's dog",
-    "Elite Dangerous",
-    "Tetris 69",
-    "Left 4 Dead 2"
-]
 //#endregion
 
 /**
@@ -781,8 +714,8 @@ client.on("ready", () => {
     scroller = setInterval(() => {//update the message
         let messages = [//activities to scroll through
             { name: `out for ${config.prefix}`, options: { 'type': "WATCHING" } },
-            { name: `over ${client.users.cache.size} users`, options: { 'type': "WATCHING" } },
-            { name: randomGames[Math.round(Math.random() * randomGames.length)], options: { 'type': "PLAYING" } }
+            { name: `${client.users.cache.size} users`, options: { 'type': "WATCHING" } },
+            { name: `with the API`, options: { 'type': "PLAYING" } }
         ]
         client.user.setActivity(messages[ss].name, messages[ss].options)
         if (ss >= messages.length - 1) ss = 0; else ss++;
