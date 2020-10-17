@@ -10,7 +10,6 @@ var roleQueue = []
 const client = new Discord.Client();
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000" }
 
-if (!config.cacheTime) config.cacheTime = 8.64e+7//this is only for an update
 
 //makes sure the server settings are up to date
 setTimeout(() => {//gives it a moment for the cache
@@ -406,8 +405,9 @@ function handleWaitResponse(user, content) {
     //this part needs to test the API key to make sure it works, and only remove them from the waitlist if it does
     //after that, assuming its valid, add it to the registration file
     let key = content.trim()
-    apiFetch('tokeninfo', key).then(r => {
-        try {
+    try {
+        apiFetch('tokeninfo', key).then(r => {
+            if (!r.permissions) return;//wasn't parsed properly
             if (!r.permissions.includes('guilds')) { user.send("This key is missing guild permissions. Please fix this and again."); return; }
             waitList.delete(user.id)//remove them from the waitlist
             apiFetch('account', key).then(r => {//request for user guilds
@@ -419,25 +419,25 @@ function handleWaitResponse(user, content) {
                     }
                 })
             })
-        } catch (err) {//catch error during setup
-            log("ERR", `Failed guild setup: ${err}`)
+            //send confirmation message after its done
+            console.log("New link:" + user.id)
             user.send({
                 "embed": {
-                    "description": "❌ There was an error during setup. Did you provide a valid API key? Please DM <@" + config.owner.id + "> if you'd like help",
-                    "color": colors.error
+                    "description": "✅ Your account was linked successfully",
+                    "color": colors.success
                 }
             })
-            return;
-        }
-        //send confirmation message after its done
-        console.log("New link:" + user.id)
+        })
+    } catch (err) {//catch error during setup
+        log("ERR", `Failed guild setup: ${err}`)
         user.send({
             "embed": {
-                "description": "✅ Your account was linked successfully",
-                "color": colors.success
+                "description": "❌ There was an error during setup. Did you provide a valid API key? Please DM <@" + config.owner.id + "> if you'd like help",
+                "color": colors.error
             }
         })
-    })
+        return;
+    }
 }
 
 /**
@@ -503,11 +503,15 @@ function newGuild(id, key, owner) {
                     ranks.forEach(r => {//append each rank to the guild object
                         newGuild.ranks.push({ "id": r.id, "order": r.order, "icon": r.icon })
                     })
+                }).catch(e => {
+                    log('ERR', `Error while fetching ranks for ${id} : ${e}`)
                 })
             }
             setTimeout(() => {//wait for ranks to fetch - ik theres better ways to do this
                 config.guilds.push(newGuild)
             }, 1000);
+        }).catch(e => {
+            log('ERR', `Error while fetching guild data for ${id} : ${e}`)
         })
     }
     ///////
@@ -662,7 +666,7 @@ function apiFetch(path, token) {
                 data += chunk;
             });
             res.once('error', (e) => {
-                reject(e.message);
+                reject(`${e.message} : ${e.stack}`);
             });
             res.once('close', () => {
                 let parsed = JSON.parse(data.replace(/\n/g, ' '));//removes all the \n so it can be parsed
