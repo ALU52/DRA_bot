@@ -739,7 +739,7 @@ client.on("ready", () => {
     log('INFO', "Logged in and ready to go")
     scrollInterval = setInterval(() => {//update the message
         let messages = [//activities to scroll through
-            { name: `for ${config.prefix}`, options: { 'type': "LISTENING" } },
+            { name: `people who say "${config.prefix}"`, options: { 'type': "LISTENING" } },
             { name: `${client.users.cache.size} users`, options: { 'type': "WATCHING" } },
             { name: `with the API`, options: { 'type': "PLAYING" } }
         ]
