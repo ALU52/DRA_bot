@@ -328,16 +328,17 @@ const queAdder = setInterval(() => {//adds every account to the update que every
 let queueDelay = 1200
 const queueManager = setInterval(() => {
     if (roleQueue.length >= 1) {//only run if theres someone there
-        let user = roleQueue[0]
-        if (!user.guild.me.hasPermission('MANAGE_ROLES')) { log('ERR', `I don't have permission to manage roles in ${user.guild.id}`); roleQueue.splice(0); return; }//always splice before return
-        console.log(`Checking ${user.user.tag}`)
-        let account = accounts.find(a => a.id === user.id)
+        let member = roleQueue[0]
+        if (!member.guild.me.hasPermission('MANAGE_ROLES')) { log('ERR', `I don't have permission to manage roles in ${member.guild.id}`); roleQueue.splice(0); return; }//always splice before return
+        console.log(`Checking ${member.user.tag}`)
+        let account = accounts.find(a => a.id === member.id)
         if (account) {//first check if they're registered
             //linked, now use the cache or update it if needed
             try {
                 if ((Date.now() - account.time) > config.cacheTime) {//outdated cache - update it and run the que on this account again
-                    apiFetch('account', key).then(r => {//copied from handlewaitresponse()
-                        accounts.push({ "id": user.id, "guilds": r.guilds, "time": Date.now(), "key": content })//add them to the account file
+                    apiFetch('account', account.key).then(r => {//copied from handlewaitresponse()
+                        account.guilds = r.guilds
+                        account.time = Date.now()//update account
                         r.guilds.forEach(g => {//callback for each guild the user is in
                             if (config.guilds.find(i => i.id == g)) return//ignores guilds it already knows about
                             else {
@@ -345,7 +346,7 @@ const queueManager = setInterval(() => {
                             }
                         })
                     }).catch((e) => {
-                        log('ERR', `Failed to update guild details for ${user.user.id}: ${e}`)
+                        log('ERR', `Failed to update guild details for ${member.user.id}: ${e}`)
                         roleQueue.splice(0)//remove from queue after its done
                         return;
                     })
@@ -354,11 +355,11 @@ const queueManager = setInterval(() => {
                 } else {//nah, the cache is still valid
                     account.guilds.forEach(g => {//for each cached guild from this account
                         let guild = config.guilds.find(cg => cg.id == g)//first find the guild in the config
-                        if (guild.links[user.guild.id]) {//if the guild has a link to the server
-                            guild.links[user.guild.id].forEach(l => {
+                        if (guild.links[member.guild.id]) {//if the guild has a link to the server
+                            guild.links[member.guild.id].forEach(l => {
                                 if (l.rank == 0) {//automatically assign rank 0 because everybody gets them
-                                    if (user.roles.cache.has(l.role)) { roleQueue.splice(0); return; } //ignore if they already have it
-                                    user.roles.add(l.role)//add the role
+                                    if (member.roles.cache.has(l.role)) { roleQueue.splice(0); return; } //ignore if they already have it
+                                    member.roles.add(l.role, `This user is in ${guild.name} - adding the role linked to it`)//add the role
                                 }
                                 //
                                 // - Under construction - this next part will search for the guild ranks and assign them if needed
@@ -369,22 +370,20 @@ const queueManager = setInterval(() => {
                 }
             } catch (err) {//unlink on uncaught error
                 //massive error scope because lots could go wrong in the part above
-                log(`ERR`, `Error while checking ${user.id}, unlinked their account. \n${err}`)
+                log(`ERR`, `Error while checking ${member.id}, unlinked their account. \n${err}`)
                 client.users.fetch(account.id).then(u => {//let the user know there was an error and their account has been unlinked
-                    let acc = accounts.findIndex(a => a.id == user.id)
+                    let acc = accounts.findIndex(a => a.id == member.id)
                     accounts.splice(acc)
                     u.send({
                         "embed": {
-                            "embed": {
-                                "description": "❌ Something went wrong when I checked your Gw2 account! It's likely that the linked API key was deleted.\nTo avoid spamming the API, your account was automatically unlinked",
-                                "color": colors.error
-                            }
+                            "description": "❌ Something went wrong when I checked your Gw2 account! It's likely that the linked API key was deleted.\nTo avoid spamming the API, your account was automatically unlinked",
+                            "color": colors.error
                         }
                     })
                 })
             }
         } else {
-            console.log(`No link was found for ${user.user.tag}`)
+            console.log(`No link was found for ${member.user.tag}`)
         }
         roleQueue.splice(0)//remove from queue after its done
     }
