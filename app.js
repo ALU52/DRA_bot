@@ -315,20 +315,18 @@ client.on("message", (msg) => {
 
 //#region Tick
 //queue managers
-const queAdder = setInterval(() => {//adds every account to the update que every 5 min - looks like its ignoring offline users, this will need to be patched
-    console.log("Refreshing accounts")
+const queAdder = setInterval(() => {//adds every account to the update que - looks like its ignoring offline users, not sure how to fix this
     client.guilds.cache.forEach(g => {//does this instead of all members because it needs to manage their roles
-        let users = g.members.cache.filter(u => !u.user.bot)//filters out bots
-        users.forEach(u => {//adds each user to the queue
-            roleQueue.push(u)
+        g.members.cache.filter(u => !u.user.bot).forEach(u => {//adds each user to the queue while excluding bots
+            roleQueue.unshift(u)
         })
     })
-}, 300000);//default is 300000 - which runs every 5 minutes
+}, 30000);//default is 300000 - which runs every 5 minutes // cranked up because I added a cache to use instead
 //this is to avoid making the APIs angry with me
-let queueDelay = 1200
+let queueDelay = 500
 const queueManager = setInterval(() => {
     if (roleQueue.length >= 1) {//only run if theres someone there
-        let member = roleQueue[0]
+        let member = roleQueue[roleQueue.length - 1]
         if (!member.guild.me.hasPermission('MANAGE_ROLES')) { log('ERR', `I don't have permission to manage roles in ${member.guild.id}`); roleQueue.splice(0); return; }//always splice before return
         console.log(`Checking ${member.user.tag}`)
         let account = accounts.find(a => a.id === member.id)
@@ -347,10 +345,10 @@ const queueManager = setInterval(() => {
                         })
                     }).catch((e) => {
                         log('ERR', `Failed to update guild details for ${member.user.id}: ${e}`)
-                        roleQueue.splice(0)//remove from queue after its done
+                        roleQueue.pop()//remove from queue after its done
                         return;
                     })
-                    //use return so splice is skipped and que runs this account again, with cache this time, because I'm lazy...
+                    roleQueue.unshift(roleQueue.pop())//moves it to the back of the queue, to be run again
                     return;
                 } else {//nah, the cache is still valid
                     account.guilds.forEach(g => {//for each cached guild from this account
@@ -358,8 +356,8 @@ const queueManager = setInterval(() => {
                         if (guild.links[member.guild.id]) {//if the guild has a link to the server
                             guild.links[member.guild.id].forEach(l => {
                                 if (l.rank == 0) {//automatically assign rank 0 because everybody gets them
-                                    if (member.roles.cache.has(l.role)) { roleQueue.splice(0); return; } //ignore if they already have it
-                                    member.roles.add(l.role, `This user is in ${guild.name} - adding the role linked to it`)//add the role
+                                    if (member.roles.cache.has(l.role)) { roleQueue.pop; return; } //ignore if they already have it
+                                    member.roles.add(l.role, `This user is in "${guild.name}" - adding the role linked to it`)//add the role
                                 }
                                 //
                                 // - Under construction - this next part will search for the guild ranks and assign them if needed
@@ -383,9 +381,14 @@ const queueManager = setInterval(() => {
                 })
             }
         } else {
-            console.log(`No link was found for ${member.user.tag}`)
+            if (!config.serverSettings[member.guild.id]) return;
+            if (config.serverSettings[member.guild.id].unregisteredRole != null) {
+                member.roles.add(config.serverSettings[member.guild.id].unregisteredRole).catch(e => {
+                    log('ERR', `Failed to manage ${member.id}'s roles: ${e}`)
+                })
+            }
         }
-        roleQueue.splice(0)//remove from queue after its done
+        roleQueue.pop()//remove from queue after its done
     }
 }, queueDelay);
 //file backup
