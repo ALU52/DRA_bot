@@ -1,8 +1,7 @@
 const https = require('https')
 const fs = require('fs')
 const child = require('child_process')
-const { ReactionUserManager } = require('discord.js')
-const homeURL = "https://raw.githubusercontent.com/ALU52/GwA-Bot/master/"
+const homeURL = "https://raw.githubusercontent.com/ALU52/DRA_bot/master/"
 const ignore = ["config.json", "app.log", "node_modules", "accounts.json", ".git"]
 const files = fs.readdirSync("./").filter(f => !ignore.includes(f)).filter(f => !f.includes(".bak"))
 
@@ -17,7 +16,7 @@ let updater = setInterval(() => {
 }, 600000);// (3.6e+6)
 
 setTimeout(() => {//gives it a chance to update before starting
-    bot = child.fork("./app.js")
+    bot = child.fork("./bot.js")
     bot.on('disconnect', () => {
         if (needsRestart) return; //ignore if its restarting
         log('WARN', "The parent lost connection to the bot! Updates have been disabled.")
@@ -53,7 +52,7 @@ function checkUpdates() {
                         log('INFO', `GitHub has a different version of ${f} - overwriting...`)
                         fs.writeFile(`./${f}`, data, (err) => {
                             if (fs.statSync(`./${f}`).size > 0 && !err) {//checks for errors
-                                if (f == "updater.js") log('WARN', "Changes made to updater will not take effect until manually restarted")
+                                if (f == "app.js") log('WARN', "Changes made to app.js will not take effect until manually restarted")
                                 log(`INFO`, `Done`)
                                 needsRestart = true;
                                 fs.unlinkSync(`./${f}.bak`)
@@ -92,7 +91,7 @@ function checkUpdates() {
                 bot = null;
                 setTimeout(() => {
                     needsRestart = false;
-                    bot = child.fork("./app.js")//wait a bit and start it back up
+                    bot = child.fork("./bot.js")//wait a bit and start it back up
                     //add listeners again
                     bot.on('disconnect', () => {
                         if (needsRestart) return; //ignore if its restarting
