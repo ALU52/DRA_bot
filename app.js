@@ -97,7 +97,7 @@ client.on("message", (msg) => {
         case "link":
             if (accounts.find(a => a.id == msg.author.id)) { msg.reply("your account is already linked!"); break; }//if its already there
             else {
-                msg.channel.send(`You got it, <@${msg.author.id}>! Please check your DMs`)
+                if (msg.channel.type != 'dm') msg.channel.send(`You got it, <@${msg.author.id}>! Please check your DMs`)
                 msg.author.send(setupEmbed)
                 waitList.add(msg.author.id)
             }
@@ -327,7 +327,7 @@ let queueDelay = 500
 const queueManager = setInterval(() => {
     if (roleQueue.length >= 1) {//only run if theres someone there
         let member = roleQueue[roleQueue.length - 1]
-        if (!member.guild.me.hasPermission('MANAGE_ROLES')) { log('ERR', `I don't have permission to manage roles in ${member.guild.id}`); roleQueue.splice(0); return; }//always splice before return
+        if (!member.guild.me.hasPermission('MANAGE_ROLES')) { log('ERR', `I don't have permission to manage roles in ${member.guild.id}`); roleQueue.pop(); return; }//always splice before return
         console.log(`Checking ${member.user.tag}`)
         let account = accounts.find(a => a.id === member.id)
         if (account) {//first check if they're registered
@@ -355,6 +355,7 @@ const queueManager = setInterval(() => {
                         let guild = config.guilds.find(cg => cg.id == g)//first find the guild in the config
                         if (guild.links[member.guild.id]) {//if the guild has a link to the server
                             guild.links[member.guild.id].forEach(l => {
+                                if (!l || !l.rank) { roleQueue.pop(); return; }
                                 if (l.rank == 0) {//automatically assign rank 0 because everybody gets them
                                     if (member.roles.cache.has(l.role)) { roleQueue.pop; return; } //ignore if they already have it
                                     member.roles.add(l.role, `This user is in "${guild.name}" - adding the role linked to it`)//add the role
