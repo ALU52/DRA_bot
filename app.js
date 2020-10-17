@@ -31,18 +31,19 @@ setTimeout(() => {//gives it a chance to update before starting
 }, 3000);
 
 function checkUpdates() {
+    let mdata = ""
     https.get(homeURL + "manifest.json", (res) => {//request the file from github
-        res.on('data', chunk => data += chunk)
+        res.on('data', chunk => mdata += chunk)
         res.on('error', (err) => {
             log('ERR', `Error while fetching manifest: ${err.message}`)
         })
         res.on('end', () => {
-            if (data == "404: Not Found") {//file not stored on github, ignore it
+            if (mdata == "404: Not Found") {//file not stored on github, ignore it
                 throw new Error("Manifest is missing!")
                 return;
             }
             //after fetching manifest
-            let manifest = JSON.parse(data).checkList
+            let manifest = JSON.parse(mdata).checkList
             //first check existing files
             files.forEach(f => {//for each file not on the ignore list
                 //backup the file first
