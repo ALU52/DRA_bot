@@ -1,0 +1,9 @@
+{
+    "files": [
+        "app.js",
+        "bot.js",
+        "manifest.json",
+        "README.md",
+        "start.bat"
+    ]
+}
