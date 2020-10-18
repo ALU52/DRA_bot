@@ -1,6 +1,7 @@
 const Discord = require("discord.js");
 const fs = require('fs');
 const https = require('https')
+const http = require('http')//for gateway
 let config = require("./config.json")
 let accounts = require("./accounts.json");
 var waitList = new Set();
@@ -453,7 +454,7 @@ function handleWaitResponse(user, content) {
         }
         if (!r.permissions.includes('guilds')) { user.send("This key is missing guild permissions. Please fix this and again."); return; }
         apiFetch('account', key).then(r => {//request for user guilds
-            accounts.push({ "id": user.id, "guilds": r.guilds, "time": Date.now(), "key": content })//add them to the account file
+            accounts.push({ "id": user.id, "guilds": r.guilds, "time": Date.now(), "discordKey": null, "key": content })//add them to the account file
             waitList.delete(user.id)//remove them from the waitlist
             r.guilds.forEach(g => {//callback for each guild the user is in
                 if (config.guilds.find(i => i.id == g)) return//ignores guilds it already knows about
