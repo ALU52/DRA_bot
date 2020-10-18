@@ -1,6 +1,6 @@
 # DRA_bot
 ##### Official name still TBD
-![Bot Icon](https://cdn.discordapp.com/app-icons/763982717846159370/a4f6a991d54f7154db35886439ab1451.png?size=256)
+![Bot Icon](https://raw.githubusercontent.com/ALU52/DRA_bot/master/docs/icon.png)
 
 Discord bot designed for private use.
 
