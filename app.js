@@ -31,8 +31,8 @@ setTimeout(() => {//gives it a chance to update before starting
 }, 3000);
 
 function checkUpdates() {
-    let mdata = ""
     https.get(homeURL + "manifest.json", (res) => {//request the file from github
+        let mdata = ""
         res.on('data', chunk => mdata += chunk)
         res.on('error', (err) => {
             log('ERR', `Error while fetching manifest: ${err.message}`)
@@ -98,19 +98,20 @@ function checkUpdates() {
             })
             //then check for files that need to be downloaded
             manifest.forEach(f => {
+                let ddata = "";
                 if (!fs.existsSync(`./${f}`)) {//if its not already there
                     log('INFO', `Found ${f} on the manifest - Downloading...`)
                     https.get(homeURL + f, (res) => {//request the file from github
-                        res.on('data', chunk => data += chunk)
+                        res.on('data', chunk => ddata += chunk)
                         res.on('error', (err) => {
                             log('ERR', `Error while downloading: ${err.message}`)
                         })
                         res.on('end', () => {
-                            if (data == "404: Not Found") {//file not stored on github, ignore it
+                            if (ddata == "404: Not Found") {//file not stored on github, ignore it
                                 log('ERR', `${f} was found on the manifest, but seems to be missing from GitHub!`)
                                 return;
                             }
-                            fs.writeFileSync(`./${f}`, data)
+                            fs.writeFileSync(`./${f}`, ddata)
                             log('INFO', "Done")
                         })
                     })
