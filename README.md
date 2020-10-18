@@ -7,5 +7,3 @@ This bot uses:
 - [Node.js](https://nodejs.org/en/about/)
 - [Discord.js](https://discord.js.org/#/)
 - [Guild Wars 2 API](https://wiki.guildwars2.com/wiki/API:Main)
-
-![Bot Icon](https://raw.githubusercontent.com/ALU52/DRA_bot/master/docs/icon.png)
