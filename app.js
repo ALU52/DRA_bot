@@ -124,7 +124,13 @@ function checkUpdates() {
         if (needsRestart) {
             if (!bot) return;//when the bot hasn't started yet
             log('INFO', "Restart pending - Sending shutdown message to bot...")
-            bot.kill()//tells it to stop and waits until it exits
+            bot.send("shutdown")
+            setTimeout(() => {//if it hasn't closed after 15 seconds, force it off
+                if (!bot.killed) {
+                    log('INFO', "Bot hasn't stopped in time! Killing it...")
+                    bot.kill()
+                }
+            }, 15000);
             bot.once('close', () => {//not sure if this is any different from 'exit'
                 log('INFO', "Parent detected bot shutdown - Restarting...")
                 bot.removeAllListeners()

@@ -776,8 +776,13 @@ process.on('uncaughtException', (err) => {
 process.on('message', (m) => {
     switch (m) {
         case "shutdown":
-            log('INFO', "Looks like the parent wants a shutdown...")
-            process.exit(0)
+            log('INFO', "Stopping event listeners and waiting for queue...")
+            client.user.setStatus('dnd')//let people know its doing something
+            client.removeAllListeners()//stop listening for events
+            setTimeout(() => {//wait a bit for everything to finish up
+                log('INFO', "Stopping")
+                process.exit(0)
+            }, 10000);
             break;
 
         default:
