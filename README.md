@@ -1,7 +1,6 @@
-# DRA_bot
-### Alliance Bot
+# Alliance Bot
 
-Discord bot designed for private use.
+Discord bot designed to interact with the Gw2 API and help with Guild role management.
 
 Libraries and APIs:
 - [Node.js](https://nodejs.org/en/about/)
