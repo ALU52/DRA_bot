@@ -1,8 +1,6 @@
 # DRA_bot
 ##### Official name still TBD
 
-![Bot banner](https://raw.githubusercontent.com/ALU52/DRA_bot/master/docs/banner.png)
-
 Discord bot designed for private use.
 
 This bot uses:
