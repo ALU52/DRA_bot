@@ -40,7 +40,7 @@ function checkUpdates() {
         res.on('end', () => {
             if (mdata == "404: Not Found") {//file not stored on github, ignore it
                 throw new Error("Manifest is missing!")
-                return;
+                return;//I know this isn't needed, but it makes me feel safer
             }
             //after fetching manifest
             let manifest = JSON.parse(mdata).checkList
