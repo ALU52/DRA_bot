@@ -12,31 +12,17 @@
 <body>
     <div id="appMount">
         <div class="topNav">
-            <a class="active" id="homeButton" onclick=home() href="#home"><b>Home</b></a>
-            <a class="inactive" id="updatesButton" onclick=updates() href="#updates"><b>Updates</b></a>
+            <a class="active" onclick="nav('homeButton')" id="homeButton" href="#home"><b>Home</b></a>
+            <a onclick="nav('updatesButton')" id="updatesButton" href="#updates"><b>Updates</b></a>
             <a href="https://github.com/ALU52/DRA_bot">
                 <img src="https://github.githubassets.com/favicons/favicon-dark.png"
                     style="height: 16px; width: 16px" /><b> GitHub</b></a>
         </div>
-        <div id="appDisplay">
-
-        </div>
+        <div id="appDisplay"></div>
     </div>
 
 </body>
-
-<script>
-    function home() {
-        document.getElementById("homeButton").class = "active"
-        document.getElementById("updatesButton").class = "inactive"
-    }
-    function updates() {
-        document.getElementById("updatesButton").class = "active"
-        document.getElementById("homeButton").class = "inactive"
-    }
-</script>
-
-
+<!--this page is broke as h e l l-->
 <!-- Load React. -->
 <!-- Note: when deploying, replace "development.js" with "production.min.js". -->
 <script src="https://unpkg.com/react@16/umd/react.development.js" crossorigin></script>
