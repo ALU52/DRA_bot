@@ -779,8 +779,8 @@ process.on('uncaughtException', (err) => {
 process.on('message', (m) => {//manages communication with parent
     switch (m) {
         case "shutdown":
-            log('INFO', "Shutting down...")
-            client.user.setStatus('dnd')//let people know its doing something
+            log('INFO', "Stopping all listeners...")
+            client.user.setStatus("dnd")//let people know its doing something
             clearInterval(scrollInterval)
             client.user.setActivity({ name: "Restarting...", options: { 'type': "PLAYING" } })
             client.removeAllListeners()//stop listening for bot events
@@ -801,7 +801,7 @@ process.on('message', (m) => {//manages communication with parent
 
 //#region Website gateway
 //under development
-let server = http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
     let jsonRes = {}//the response object that will always be returned
     //used to make sure the user actually has permission for this
     let auth = req.headers.authorization
