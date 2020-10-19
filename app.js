@@ -126,7 +126,7 @@ function checkUpdates() {
             log('INFO', "Restart pending - Sending shutdown message to bot...")
             bot.send("shutdown")
             setTimeout(() => {//if it hasn't closed after 15 seconds, force it off
-                if (!bot.killed) {
+                if (bot.connected) {
                     log('INFO', "Bot hasn't stopped in time! Killing it...")
                     bot.kill()
                 }
