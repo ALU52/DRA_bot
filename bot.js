@@ -739,8 +739,7 @@ let msn = 0;
 client.on("ready", () => {
     console.clear()
     client.user.setStatus('online')
-    console.log(`${client.user.username} is ready!`);
-    log('INFO', "Logged in and ready to go")
+    log('INFO', "Bot ready!")
     scrollInterval = setInterval(() => {//update the message
         let messages = [//activities to scroll through
             { name: `messages with "${config.prefix}"`, options: { 'type': "LISTENING" } },
@@ -787,7 +786,6 @@ process.on('message', (m) => {//manages communication with parent
             server.removeAllListeners()//stop listening for API events
             server.close()//close the server
             setTimeout(() => {//wait a bit for everything to finish up
-                log('INFO', "Stopping")
                 process.exit(0)
             }, 10000);
             break;

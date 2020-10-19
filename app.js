@@ -126,7 +126,7 @@ function checkUpdates() {
             log('INFO', "Restart pending - Sending shutdown message to bot...")
             bot.send("shutdown")
             bot.once('close', () => {//not sure if this is any different from 'exit'
-                log('INFO', "Parent detected bot shutdown - Restarting...")
+                log('INFO', "Bot closed - Restarting...")
                 bot.removeAllListeners()
                 bot = null;
                 setTimeout(() => {
