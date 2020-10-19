@@ -307,7 +307,8 @@ client.on("message", (msg) => {
             break;
 
         default:
-            //ignore unknown commands
+            //react with a question mark to unknown commands
+            msg.react('❓')
             break;
     }
 })
