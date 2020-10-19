@@ -9,8 +9,8 @@ class topNav extends React.Component {
     }
 
     render() {
-        if (this.state.liked) {
-            return 'You liked this.';
+        if (this.state.selected) {
+            return 'You selected this.';
         }
 
         return e(
@@ -21,5 +21,5 @@ class topNav extends React.Component {
     }
 }
 
-const domContainer = document.querySelector('#like_button_container');
+const domContainer = document.querySelector('#appDisplay');
 ReactDOM.render(e(topNav), domContainer);
