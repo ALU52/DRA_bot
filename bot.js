@@ -10,7 +10,7 @@ var roleQueue = []
 
 const client = new Discord.Client();
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000" }
-
+config.lastBoot = Date.now()
 
 //makes sure the server settings are up to date
 setTimeout(() => {//gives it a moment for the cache
@@ -79,7 +79,7 @@ client.on("message", (msg) => {
             msg.reply(`Pong!\nResponse time: ${client.ws.ping} ms`)
             break;
 
-        case "stats":
+        case "info":
             //gather up the stats
             let totalUsers = msg.guild.members.cache.filter((m) => m.user.bot == false)//filters out bots
             let serverReg = 0;
@@ -88,8 +88,8 @@ client.on("message", (msg) => {
             })
             msg.channel.send({
                 "embed": {
-                    "title": "Registration stats",
-                    "description": "\`\`\`\n" + "[" + serverReg + "/" + totalUsers.size + "] Registered users in this server \n[" + accounts.length + "] Total registered users\n[" + config.guilds.length + "] Total registered guilds\n[" + roleQueue.length + "] Users in the queue\`\`\`",
+                    "title": "Bot stats",
+                    "description": "\`\`\`\n" + "[" + serverReg + "/" + totalUsers.size + "] Registered users in this server \n[" + accounts.length + "] Total registered users\n[" + config.guilds.length + "] Total registered guilds\n[" + roleQueue.length + "] Users in the queue\nLast restart was " + timeDifference(config.lastBoot) + "\`\`\`",
                     "color": config.defaultColor,
                 }
             })
@@ -732,10 +732,11 @@ function timeDifference(previous) {
 
 //#endregion
 
-//#region Events\
+//#region Events
 let scrollInterval;
 let msn = 0;
 client.on("ready", () => {
+    client.user.setStatus('online')
     console.log(`${client.user.username} is ready!`);
     log('INFO', "Logged in and ready to go")
     scrollInterval = setInterval(() => {//update the message
@@ -773,13 +774,14 @@ client.on('error', (err) => {
 process.on('uncaughtException', (err) => {
     log('ERR', `Uncaught exception: ${err.name}:${err.message} - ${err.stack}`)
 })
-//communication with parent
-process.on('message', (m) => {
+process.on('message', (m) => {//manages communication with parent
     switch (m) {
         case "shutdown":
-            log('INFO', "Stopping event listeners and waiting for queue...")
+            log('INFO', "Shutting down...")
             client.user.setStatus('dnd')//let people know its doing something
-            client.removeAllListeners()//stop listening for events
+            client.removeAllListeners()//stop listening for bot events
+            server.removeAllListeners()//stop listening for API events
+            server.close()//close the server
             setTimeout(() => {//wait a bit for everything to finish up
                 log('INFO', "Stopping")
                 process.exit(0)
@@ -791,4 +793,75 @@ process.on('message', (m) => {
             break;
     }
 })
+//#endregion
+
+//#region Website gateway
+//under development
+let server = http.createServer((req, res) => {
+    let jsonRes = {}//the response object that will always be returned
+    //used to make sure the user actually has permission for this
+    let auth = req.headers.authorization
+    //used to recognize server specific settings
+    let serverRegex = /\d{17,21}/
+    let jsonResponse = true;
+    try {
+        if (req.method == "GET") {//used for fetching bot data
+            let url = req.url.split("/")
+            let server = url[1].match(serverRegex)
+            if (server) {//get data from server
+                if (!auth) {//no auth
+                    jsonRes.code = 401
+                    jsonRes.message = "This endpoint requires authorization via Discord"
+                } else {//auth provided
+
+                }
+            } else {//other requests
+                switch (url[1]) {
+                    case "endpoints":
+                        jsonRes.message = "Discord server IDs may also be used in URLs. e.g. /767051229184131091 for info on this server. However, authentication is required for this. Documentation can be found on GitHub"
+                        jsonRes.endpoints = ["/", "/endpoints", "/stats"]
+                        jsonRes.code = 200
+                        break;
+
+
+                    case "stats":
+                        jsonRes.totalUsers = "placeholder"
+                        jsonRes.registeredUsers = "placeholder"
+                        jsonRes.registeredGuilds = "placeholder"
+                        jsonRes.uptime = "placeholder"
+                        jsonRes.code = 200
+                        break;
+
+                    case "consent":
+                        jsonResponse = false;
+                        res.writeHead(302, { 'Location': consentUrl })
+                        break;
+
+                    case "":
+                        jsonRes.message = "You aren't supposed to visit this url like a web page, silly";
+                        jsonRes.code = 200;
+                        break;
+
+                    default:
+                        jsonRes.message = "Unknown request";
+                        jsonRes.code = 404
+                        break;
+                }
+            }
+        } else if (req.method == "POST") {//used for changing settings
+
+        } else {//unknown method - probably a bad thing
+            jsonRes.message = "Method not allowed"
+            jsonRes.code = 400
+        }
+    } catch (error) {//let the client know if there are any errors
+        jsonRes.message = error.message
+        jsonRes.code = 500
+    }
+    if (jsonResponse) {
+        res.statusCode = jsonRes.code
+        res.write(JSON.stringify(jsonRes))
+        res.end()
+    }
+}).listen(8080)
 //#endregion
