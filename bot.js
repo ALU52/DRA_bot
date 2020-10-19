@@ -738,7 +738,9 @@ let scrollInterval;
 let msn = 0;
 client.on("ready", () => {
     console.clear()
-    client.user.setStatus('online')
+    setTimeout(() => {
+        client.user.setActivity({ name: "Just logged in!", options: { 'type': "PLAYING" } })
+    }, 1000);
     log('INFO', "Bot ready!")
     scrollInterval = setInterval(() => {//update the message
         let messages = [//activities to scroll through
