@@ -780,6 +780,8 @@ process.on('message', (m) => {//manages communication with parent
         case "shutdown":
             log('INFO', "Shutting down...")
             client.user.setStatus('dnd')//let people know its doing something
+            clearInterval(scrollInterval)
+            client.user.setActivity({ name: "Restarting...", options: { 'type': "PLAYING" } })
             client.removeAllListeners()//stop listening for bot events
             server.removeAllListeners()//stop listening for API events
             server.close()//close the server
