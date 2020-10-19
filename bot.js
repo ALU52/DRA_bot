@@ -737,6 +737,7 @@ function timeDifference(previous) {
 let scrollInterval;
 let msn = 0;
 client.on("ready", () => {
+    console.clear()
     client.user.setStatus('online')
     console.log(`${client.user.username} is ready!`);
     log('INFO', "Logged in and ready to go")
