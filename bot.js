@@ -339,7 +339,7 @@ const queAdder = setInterval(() => {//adds every account to the update que - loo
             roleQueue.unshift(u)
         })
     })
-}, 30000);//default is 300000 - which runs every 5 minutes // cranked up because I added a cache to use instead
+}, 300000);//default is 300000 - which runs every 5 minutes
 //this is to avoid making the APIs angry with me
 let queueDelay = 500
 const queueManager = setInterval(() => {
