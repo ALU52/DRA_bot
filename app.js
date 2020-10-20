@@ -46,6 +46,9 @@ function checkUpdates() {
             let manifest = JSON.parse(mdata).checkList
             //first check existing files
             files.forEach(f => {//for each file not on the ignore list
+                if (fs.statSync(`./${f}`).isDirectory()) {//ignores directories
+                    return;
+                }
                 //backup the file first
                 try {
                     fs.copyFileSync(`./${f}`, `./${f}.bak`)

@@ -11,6 +11,7 @@ var roleQueue = []
 const client = new Discord.Client();
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000" }
 config.lastBoot = Date.now()
+if (!config.serverSettings) config.serverSettings = {}
 
 //makes sure the server settings are up to date
 setTimeout(() => {//gives it a moment for the cache
@@ -67,6 +68,7 @@ client.on("message", (msg) => {
     if (msg.author.bot || !msg.content.startsWith(config.prefix) || config.blacklist.includes(msg.author.id)) return;
 
     let messageArray = msg.content.split(" ")
+    if (messageArray[0] == "") messageArray.shift()//in case it gets empty args somehow
     let cmd = messageArray[0].substring(config.prefix.length).toLowerCase();
     const args = messageArray.slice(1);
 
@@ -204,7 +206,7 @@ client.on("message", (msg) => {
             }
             break;
 
-        case "roles"://this command keeps crashing the bot
+        case "roles":
             if (msg.channel.type == "dm") { msg.reply("this command can only be used in servers"); return; }
             let guilds = config.guilds.filter(g => Object.getOwnPropertyNames(g.links).includes(msg.guild.id))//find all the guilds tied to this server
             let collected = []
@@ -303,7 +305,21 @@ client.on("message", (msg) => {
         case "set":
             //under construction
             //this command is for other server-specific settings, as stored in config
+            //the webpage and web-to-bot API will be a workaround for this - to make up for its user unfriendliness
             //will allow an "unregistered" role to be automatically given to anybody who hasn't linked their account, among other things
+            switch (args[0].toLowerCase()) {
+                case "unregisteredrole":
+                    if (!args[1]) {//missing argument
+
+                    } else {//args good
+
+                    }
+                    break;
+
+                default:
+                    break;
+            }
+
             break;
 
         default:
@@ -464,7 +480,7 @@ function handleWaitResponse(user, content) {
                 }
             })
             //send confirmation message after its done
-            console.log("New link:" + user.id)
+            log('INFO', `New link: ${user.id}`)
             user.send({
                 "embed": {
                     "description": `✅ Successfully linked <@${user.id}> to ${r.name}`,
@@ -579,7 +595,6 @@ function normalizeString(string) {
     })
     return result
 }
-
 //#region String collections
 const characterMap = {//this is probably the worst thing I've ever created // cases are separated because I'm not sure how lenient string.includes() is
     'a': ['A', 'a', 'À', 'Á', 'Â', 'Ã', 'Ä', 'Å', 'Æ', 'æ', 'ä'],
@@ -634,7 +649,6 @@ function log(type, message) {
 */
 function apiFetch(path, token) {
     return new Promise((resolve, reject) => {
-        console.log(`Requesting /${path}`)
         let url = "https://api.guildwars2.com/v2/" + path + `?access_token=${token}`;
         https.get(url, (res) => {
             let data = '';
