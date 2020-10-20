@@ -92,6 +92,7 @@ client.on("message", (msg) => {
             msg.channel.send({
                 "embed": {
                     "title": "Info",
+                    "url": "https://github.com/ALU52/DRA_bot",
                     "description":
                         `**Bot stats:**\`\`\`\n[${serverCount}/${totalUsers.size}] Registered users in this server \n[${accounts.length}] Total registered users\n[${config.guilds.length}] Total registered guilds\n[${roleQueue.length}] Users in the queue\nLast restart was ${timeDifference(config.lastBoot)}\`\`\`\n**System info:**\n\`\`\`Memory usage: ${Math.round((os.totalmem() - os.freemem()) * 1e-6)}/${Math.round(os.totalmem() * 1e-6)} MB\nPlatform: ${os.type()}\nArch: ${os.arch()}\nLast system restart was ${timeDifference(Date.now() - os.uptime() * 1000)}\`\`\``,
                     "color": config.defaultColor,
@@ -350,6 +351,14 @@ var queAdder = setInterval(() => {//adds every account to the update que - looks
         })
     })
 }, 300000);//default is 300000 - which runs every 5 minutes
+
+/*
+* There is a really bad error with the queue system, currently. Users are being added to it, but arent being removed
+* This can cause restarts to take much longer - and makes the bot itself basically unable
+* This bug should be top priority
+*/
+
+
 //this is to avoid making the APIs angry with me
 let queueDelay = 500
 var queueManager = setInterval(() => {
@@ -753,8 +762,6 @@ function timeDifference(previous) {
         return 'approximately ' + Math.round(elapsed / msPerYear) + ' years ago';
     }
 }
-
-
 //#endregion
 
 //#region Events
