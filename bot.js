@@ -808,7 +808,7 @@ process.on('message', (m) => {//manages communication with parent
             log('INFO', "Starting bot shutdown...")
             clearInterval(queAdder)//stop adding users to the queue
             clearInterval(scrollInterval)//stop updating presence and change to restart message
-            client.user.setActivity({ name: "with system files", options: { 'type': "PLAYING" } })
+            client.user.setActivity({ name: "with system files", options: { 'type': "PLAYING" }, status: 'dnd' })
             client.removeAllListeners()//stop listening for bot events
             server.removeAllListeners()//stop listening for API events
             server.close()//close the API server
