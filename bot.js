@@ -1,5 +1,6 @@
 const Discord = require("discord.js");
 const fs = require('fs');
+const os = require('os')
 const https = require('https')
 const http = require('http')//for gateway
 let config = require("./config.json")
@@ -84,14 +85,15 @@ client.on("message", (msg) => {
         case "info":
             //gather up the stats
             let totalUsers = msg.guild.members.cache.filter((m) => m.user.bot == false)//filters out bots
-            let serverReg = 0;
+            let serverCount = 0;
             totalUsers.forEach(u => {//finds the amount of unregistered users in the server
-                if (accounts.find(a => a.id == u.id)) serverReg++
+                if (accounts.find(a => a.id == u.id)) serverCount++
             })
             msg.channel.send({
                 "embed": {
-                    "title": "Bot stats",
-                    "description": "\`\`\`\n" + "[" + serverReg + "/" + totalUsers.size + "] Registered users in this server \n[" + accounts.length + "] Total registered users\n[" + config.guilds.length + "] Total registered guilds\n[" + roleQueue.length + "] Users in the queue\nLast restart was " + timeDifference(config.lastBoot) + "\`\`\`",
+                    "title": "Info",
+                    "description":
+                        `**Bot stats:**\`\`\`\n[${serverCount}/${totalUsers.size}] Registered users in this server \n[${accounts.length}] Total registered users\n[${config.guilds.length}] Total registered guilds\n[${roleQueue.length}] Users in the queue\nLast restart was ${timeDifference(config.lastBoot)}\`\`\`\n**System info:**\n\`\`\`Memory usage: ${Math.round((os.totalmem() - os.freemem()) * 1e-6)}/${Math.round(os.totalmem() * 1e-6)} MB\nPlatform: ${os.type()}\nArch: ${os.arch()}\nLast system restart was ${timeDifference(Date.now() - os.uptime() * 1000)}\`\`\``,
                     "color": config.defaultColor,
                 }
             })
@@ -100,7 +102,7 @@ client.on("message", (msg) => {
         case "link":
             if (accounts.find(a => a.id == msg.author.id)) { msg.reply("your account is already linked!"); break; }//if its already there
             else {
-                if (msg.channel.type != 'dm') msg.channel.send(`You got it, <@${msg.author.id}>! Please check your DMs`)
+                if (msg.channel.type != 'dm') msg.channel.send(`You got it, <@${msg.author.id}> !Please check your DMs`)
                 msg.author.send(setupEmbed)
                 waitList.add(msg.author.id)
             }
