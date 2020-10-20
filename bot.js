@@ -302,6 +302,14 @@ client.on("message", (msg) => {
             msg.reply(timeDifference(args[0]))
             break;
 
+        case "shutdown":
+            //only for emergencies
+            if (msg.author.id == config.owner.id) {
+                msg.react("✅")
+                process.exit(0)
+            }
+            break;
+
         case "set":
             //under construction
             //this command is for other server-specific settings, as stored in config
@@ -333,7 +341,8 @@ client.on("message", (msg) => {
 
 //#region Tick
 //queue managers
-const queAdder = setInterval(() => {//adds every account to the update que - looks like its ignoring offline users, not sure how to fix this
+var queAdder = setInterval(() => {//adds every account to the update que - looks like its ignoring offline users, not sure how to fix this
+    if (roleQueue.length >= 10) return;//ignore if theres already a lot in there
     client.guilds.cache.forEach(g => {//does this instead of all members because it needs to manage their roles
         g.members.cache.filter(u => !u.user.bot).forEach(u => {//adds each user to the queue while excluding bots
             roleQueue.unshift(u)
@@ -342,7 +351,7 @@ const queAdder = setInterval(() => {//adds every account to the update que - loo
 }, 300000);//default is 300000 - which runs every 5 minutes
 //this is to avoid making the APIs angry with me
 let queueDelay = 500
-const queueManager = setInterval(() => {
+var queueManager = setInterval(() => {
     if (roleQueue.length >= 1) {//only run if theres someone there
         let member = roleQueue[roleQueue.length - 1]
         let account = accounts.find(a => a.id === member.user.id)
@@ -794,16 +803,23 @@ process.on('uncaughtException', (err) => {
 process.on('message', (m) => {//manages communication with parent
     switch (m) {
         case "shutdown":
-            log('INFO', "Stopping all listeners...")
-            client.user.setStatus("dnd")//let people know its doing something
-            clearInterval(scrollInterval)
-            client.user.setActivity({ name: "Restarting...", options: { 'type': "PLAYING" } })
+            log('INFO', "Starting bot shutdown...")
+            clearInterval(queAdder)//stop adding users to the queue
+            clearInterval(scrollInterval)//stop updating presence and change to restart message
+            client.user.setActivity({ name: "with system files", options: { 'type': "PLAYING" } })
             client.removeAllListeners()//stop listening for bot events
             server.removeAllListeners()//stop listening for API events
-            server.close()//close the server
-            setTimeout(() => {//wait a bit for everything to finish up
+            server.close()//close the API server
+            setInterval(() => {
+                if (roleQueue.length == 0) {//shutdown conditions
+                    log('INFO', "Ready for shutdown")
+                    process.exit(0)
+                }
+            }, 5000);
+            setTimeout(() => {//in case it hangs or something
+                log('INFO', "Shutdown timeout reached! Forcing shutdown...")
                 process.exit(0)
-            }, 10000);
+            }, 30000);
             break;
 
         default:
