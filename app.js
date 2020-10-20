@@ -39,7 +39,7 @@ function checkUpdates() {
         })
         res.on('end', () => {
             if (mdata == "404: Not Found") {//file not stored on github, ignore it
-                throw new Error("Manifest is missing!")
+                log('WARN', "The manifest isn't on GitHub!")
                 return;//I know this isn't needed, but it makes me feel safer
             }
             //after fetching manifest
@@ -100,6 +100,7 @@ function checkUpdates() {
                 })
             })
             //then check for files that need to be downloaded
+            if (!manifest) return;
             manifest.forEach(f => {
                 let ddata = "";
                 if (!fs.existsSync(`./${f}`)) {//if its not already there
