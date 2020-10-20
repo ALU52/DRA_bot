@@ -307,8 +307,7 @@ client.on("message", (msg) => {
         case "shutdown":
             //only for emergencies
             if (msg.author.id == config.owner.id) {
-                msg.react("✅")
-                process.exit(0)
+                msg.react("✅").then(() => process.exit(0))
             }
             break;
 
@@ -764,17 +763,17 @@ let msn = 0;
 client.on("ready", () => {
     console.clear()
     setTimeout(() => {
-        client.user.setActivity({ name: "Just logged in!", options: { 'type': "PLAYING" } })
+        client.user.setPresence({ status: "idle", activity: { name: "just logged in", type: "PLAYING" } })
     }, 1000);
-    log('INFO', "Bot ready!")
+    log('INFO', "Logged in")
     scrollInterval = setInterval(() => {//update the message
-        let messages = [//activities to scroll through
-            { name: `messages with "${config.prefix}"`, options: { 'type': "LISTENING" } },
-            { name: `${client.users.cache.size} users`, options: { 'type': "WATCHING" } },
-            { name: `with the API`, options: { 'type': "PLAYING" } }
+        let scroll = [//activities to scroll through
+            { status: "online", activity: { name: `"${config.prefix}"`, type: "LISTENING" } },
+            { status: "online", activity: { name: `${client.users.cache.size} users`, type: "WATCHING" } },
+            { status: "online", activity: { name: `with the API`, type: "PLAYING" } }
         ]
-        client.user.setActivity(messages[msn].name, messages[msn].options)
-        if (msn >= messages.length - 1) msn = 0; else msn++;
+        client.user.setPresence(scroll[msn])
+        if (msn >= scroll.length - 1) msn = 0; else msn++;
     }, 135000);
 });
 client.on('guildCreate', (g) => {
@@ -808,7 +807,7 @@ process.on('message', (m) => {//manages communication with parent
             log('INFO', "Starting bot shutdown...")
             clearInterval(queAdder)//stop adding users to the queue
             clearInterval(scrollInterval)//stop updating presence and change to restart message
-            client.user.setActivity({ name: "with system files", options: { 'type': "PLAYING" }, status: 'dnd' })
+            client.user.setPresence({ status: "dnd", activity: { name: "with system files", type: "PLAYING" }, })
             client.removeAllListeners()//stop listening for bot events
             server.removeAllListeners()//stop listening for API events
             server.close()//close the API server
