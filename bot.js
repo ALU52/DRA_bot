@@ -53,6 +53,7 @@ var setupEmbed = {
 
 //update embed colors with the colors object
 
+//a bug caused accounts.json to be wiped... look into this
 
 //#region Message handler
 client.on("message", (msg) => {
@@ -428,10 +429,15 @@ var queueManager = setInterval(() => {
     }
 }, queueDelay);
 //file backup
-setInterval(() => {//saves the accounts to the file every 5 seconds
+let backup = setInterval(() => {//saves the accounts to the file every 5 seconds
     fs.writeFileSync(config.accountsPath, JSON.stringify(accounts))
     fs.writeFileSync("./config.json", JSON.stringify(config))
 }, 5000);
+function stopBackup() {
+    clearInterval(backup)//stop the timer
+    fs.writeFileSync(config.accountsPath, JSON.stringify(accounts))//save one final time
+    fs.writeFileSync("./config.json", JSON.stringify(config))
+}
 
 //#endregion
 
@@ -817,6 +823,7 @@ process.on('message', (m) => {//manages communication with parent
             client.user.setPresence({ status: "dnd", activity: { name: "with system files", type: "PLAYING" }, })
             client.removeAllListeners()//stop listening for bot events
             server.removeAllListeners()//stop listening for API events
+            stopBackup()//save one final time and stop writing to the files
             server.close()//close the API server
             setInterval(() => {
                 if (roleQueue.length == 0) {//shutdown conditions
