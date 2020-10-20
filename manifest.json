@@ -2,7 +2,7 @@
     "checkList": [
         "bot.js",
         "app.js",
-        "start.bat",
+        "start.sh",
         "README.md"
     ]
 }
