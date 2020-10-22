@@ -19,27 +19,36 @@ manifest.config is what does most of the work, it shows how the config structure
 ^ Default values are only used when the wrong data type is there, or while generating a new config.
 */
 
-if (!fs.existsSync("./accounts.json")) fs.writeFileSync("./accounts.json", "[]")
+let conFail = 0;
+process.on('uncaughtException', (err) => {
+    if (err.code == "ENOTFOUND" && conFail <= 10) { conFail++; return; }//only starts logging failed connections after the 10th occurrence
+    log('ERR', `Uncaught exception for the parent. ${err.name}: ${err.message}: ${err.stack}`)
+})
+
+if (!fs.existsSync("./accounts.json")) fs.writeFileSync("./accounts.json", "{}");
+let updater;
+checkForRepair().then(() => {//forces file integrity to be handled first
+    updater = setInterval(() => {
+        checkForRepair()
+        checkUpdates()//save the async stuff for last
+    }, 600000);// (3.6e+6)
+
+    setTimeout(() => {//gives it a chance to update before starting
+        bot = child.fork("./bot.js")
+        bot.on('disconnect', () => {
+            if (needsRestart) return; //ignore if its restarting
+            log('WARN', "The bot unexpectedly closed! Stopping parent too...")
+            clearInterval(updater)
+        })
+        bot.on('error', (err) => {
+            log('ERR', `Seems like the bot has crashed. ${err.name}: ${err.message}: ${err.stack}`)
+        })
+    }, 3000);
+    checkUpdates()
+})
 
 log('WARN', "Cold start detected")
-checkForRepair()//checks files before proceeding
-checkUpdates()//checks at startup
-let updater = setInterval(() => {
-    checkForRepair()
-    checkUpdates()//save the async stuff for last
-}, 600000);// (3.6e+6)
-
-setTimeout(() => {//gives it a chance to update before starting
-    bot = child.fork("./bot.js")
-    bot.on('disconnect', () => {
-        if (needsRestart) return; //ignore if its restarting
-        log('WARN', "The bot unexpectedly closed! Stopping parent too...")
-        clearInterval(updater)
-    })
-    bot.on('error', (err) => {
-        log('ERR', `Seems like the bot has crashed. ${err.name}: ${err.message}: ${err.stack}`)
-    })
-}, 3000);
+//checks files before proceeding
 
 function checkUpdates() {
     //first check existing files
@@ -143,71 +152,70 @@ function log(type, message) {
  * Checks the files and settings, and repairs them if needed. Uses the manifest to do this
  */
 function checkForRepair() {
-    let config;
-    if (!fs.existsSync("./config.json")) {
-        config = {}
-    } else {
-        config = require('./config.json');//load the current config
-    }
-    https.get(homeUrl + "manifest.json", (res) => {//request the file from github
-        let mData = ""
-        res.on('data', chunk => mData += chunk)
-        res.on('error', (err) => {
-            log('ERR', `Error while fetching manifest: ${err.message}`)
-        })
-        res.on('end', () => {
-            if (mData == "404: Not Found") {//file not stored on github, ignore it
-                log('WARN', "The manifest isn't on GitHub!")
-            } else {
-                //after fetching manifest
-                let manifest = JSON.parse(mData)//JSON.parse(mdata) - switch to require() for debugging
-                //then check the manifest
-                if (!manifest) { log('ERR', "Failed to parse manifest data!"); return; };
-                if (manifest.files) {
-                    manifest.files.forEach(f => {//see if it needs to download any files
-                        let dData = "";
-                        if (!fs.existsSync(`./${f}`)) {//if its not already there
-                            log('INFO', `Found ${f} on the manifest - Downloading...`);
-                            https.get(homeUrl + f, (res) => {//request the file from github
-                                res.on('data', chunk => dData += chunk);
-                                res.on('error', (err) => {
-                                    log('ERR', `Error while downloading: ${err.message}`);
+    return new Promise((resolve, reject) => {
+        let config;
+        if (!fs.existsSync("./config.json")) {
+            config = {}
+        } else {
+            config = require('./config.json');//load the current config
+        }
+        https.get(homeUrl + "manifest.json", (res) => {//request the file from github
+            let mData = ""
+            res.on('data', chunk => mData += chunk)
+            res.on('error', (err) => {
+                log('ERR', `Error while fetching manifest: ${err.message}`)
+                reject()
+            })
+            res.on('end', () => {
+                if (mData == "404: Not Found") {//file not stored on github, ignore it
+                    log('WARN', "The manifest isn't on GitHub!")
+                } else {
+                    //after fetching manifest
+                    let manifest = JSON.parse(mData)//JSON.parse(mdata) - switch to require() for debugging
+                    //then check the manifest
+                    if (!manifest) { log('ERR', "Failed to parse manifest data!"); return; };
+                    if (manifest.files) {
+                        manifest.files.forEach(f => {//see if it needs to download any files
+                            let dData = "";
+                            if (!fs.existsSync(`./${f}`)) {//if its not already there
+                                log('INFO', `Found ${f} on the manifest - Downloading...`);
+                                https.get(homeUrl + f, (res) => {//request the file from github
+                                    res.on('data', chunk => dData += chunk);
+                                    res.on('error', (err) => {
+                                        log('ERR', `Error while downloading: ${err.message}`);
+                                        reject()
+                                    })
+                                    res.on('end', () => {
+                                        if (dData == "404: Not Found") {//file not stored on github, ignore it
+                                            log('ERR', `${f} was found on the manifest, but seems to be missing from GitHub!`);
+                                            return;
+                                        }
+                                        fs.writeFileSync(`./${f}`, dData);
+                                        log('INFO', "Done");
+                                    })
                                 })
-                                res.on('end', () => {
-                                    if (dData == "404: Not Found") {//file not stored on github, ignore it
-                                        log('ERR', `${f} was found on the manifest, but seems to be missing from GitHub!`);
-                                        return;
-                                    }
-                                    fs.writeFileSync(`./${f}`, dData);
-                                    log('INFO', "Done");
-                                })
-                            })
-                        }
-                    })
-                }
-                if (manifest.config) {//checks the config integrity
-                    let confNew = manifest.config;
-                    let confNewNames = Object.getOwnPropertyNames(confNew)
-                    confNewNames.forEach(n => {
-                        if (config[n]) {//if the setting is already there
-                            if (typeof config[n] != confNew[n].type) {//only proceed if the data type is wrong
-                                log('WARN', `Incorrect data type found for ${n} - restoring default`)
+                            }
+                        })
+                    }
+                    if (manifest.config) {//checks the config integrity
+                        let confNew = manifest.config;
+                        let confNewNames = Object.getOwnPropertyNames(confNew)
+                        confNewNames.forEach(n => {
+                            if (config[n]) {//if the setting is already there
+                                if (typeof config[n] != confNew[n].type) {//only proceed if the data type is wrong
+                                    log('WARN', `Incorrect data type found for ${n} - restoring default`)
+                                    config[n] = confNew[n].default
+                                }
+                            } else {//missing setting, add it
+                                log('INFO', `Adding new setting: ${n}`)
                                 config[n] = confNew[n].default
                             }
-                        } else {//missing setting, add it
-                            log('INFO', `Adding new setting: ${n}`)
-                            config[n] = confNew[n].default
-                        }
-                    })
+                        })
+                    }
                 }
-            }
+                fs.writeFileSync("./config.json", JSON.stringify(config))
+                resolve()
+            })
         })
     })
-    fs.writeFileSync("./config.json", JSON.stringify(config))
 }
-
-let conFail = 0;
-process.on('uncaughtException', (err) => {
-    if (err.code == "ENOTFOUND" && conFail <= 10) { conFail++; return; }//only starts logging failed connections after the 10th occurrence
-    log('ERR', `Uncaught exception for the parent. ${err.name}: ${err.message}: ${err.stack}`)
-})

@@ -439,6 +439,7 @@ function stopBackup() {
 //#endregion
 
 //login after defining the events
+if (!config) { log('ERR', "The bot just tried to start without a config file!"); process.exit(1); };
 if (!config.token) { log('ERR', "Cannot login without a token!"); process.exit(1); };
 client.login(config.token).catch(e => log('ERR', `Failed to login. It's probably a connection issue\n${e}`));
 
