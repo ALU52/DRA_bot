@@ -203,7 +203,7 @@ function checkForRepair() {
             }
         })
     })
-    fs.writeFileSync("./config.json", config)
+    fs.writeFileSync("./config.json", JSON.stringify(config))
 }
 
 let conFail = 0;
