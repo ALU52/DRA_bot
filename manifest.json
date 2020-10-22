@@ -17,7 +17,7 @@
         },
         "prefix": {
             "type": "string",
-            "default": ".gw"
+            "default": "gw."
         },
         "inviteURL": {
             "type": "string",
