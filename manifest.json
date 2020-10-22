@@ -37,11 +37,11 @@
         },
         "blacklist": {
             "type": "array",
-            "defualt": []
+            "default": []
         },
         "logPath": {
             "type": "string",
-            "defualt": "./app.log"
+            "default": "./app.log"
         },
         "accountsPath": {
             "type": "array",
