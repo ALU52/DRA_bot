@@ -17,6 +17,9 @@ future versions will generate a config file, instead of downloading the one from
 manifest.files is mostly used for updates with new files, otherwise it doesn't really do anything.
 manifest.config is what does most of the work, it shows how the config structure should look. 
 ^ Default values are only used when the wrong data type is there, or while generating a new config.
+
+Future plans:
+have this file check dependencies too, installing them as needed
 */
 
 let conFail = 0;
@@ -65,69 +68,69 @@ function checkUpdates() {
         }
         let data = "";
         https.get(homeUrl + f, (res) => {//request the file from github
-            res.on('data', chunk => data += chunk)
+            res.on('data', chunk => data += chunk);
             res.on('end', () => {
                 if (data == "404: Not Found") {//file not stored on github, ignore it
-                    fs.unlinkSync(`./${f}.bak`)//delete the backup
+                    fs.unlinkSync(`./${f}.bak`);//delete the backup
                     return;
                 } else {//file found on github
-                    var file = fs.readFileSync(`./${f}`)
+                    var file = fs.readFileSync(`./${f}`);
                     if (file == data) {//its the exact same thing, ignore it
-                        fs.unlinkSync(`./${f}.bak`)//delete the backup
+                        fs.unlinkSync(`./${f}.bak`);//delete the backup
                         return;
                     } else {//changes detected
-                        log('INFO', `GitHub has a different version of ${f} - overwriting...`)
+                        log('INFO', `GitHub has a different version of ${f} - overwriting...`);
                         fs.writeFile(`./${f}`, data, (err) => {
                             if (fs.statSync(`./${f}`).size > 0 && !err) {//checks for errors
-                                if (f == "app.js") log('WARN', "Changes made to app.js will not take effect until manually restarted")
-                                log(`INFO`, `Done`)
+                                if (f == "app.js") log('WARN', "Changes made to app.js will not take effect until manually restarted");
+                                log(`INFO`, `Done`);
                                 needsRestart = true;
-                                fs.unlinkSync(`./${f}.bak`)
+                                fs.unlinkSync(`./${f}.bak`);
                                 return;
                             } else {//empty file, or error, restores backup
-                                log('WARN', `${f} was "updated" to an empty file! Restoring backup...`)
+                                log('WARN', `${f} was "updated" to an empty file! Restoring backup...`);
                                 fs.copyFile(`./${f}.bak`, `./${f}`, (err) => {
                                     if (err) {
-                                        log(`ERR`, `Couldn't restore the backup - Something has gone horribly wrong! Shutting down for safety...`)
-                                        process.exit(1)
+                                        log(`ERR`, `Couldn't restore the backup - Something has gone horribly wrong! Shutting down for safety...`);
+                                        process.exit(1);
                                     } else {
-                                        log('INFO', `Restoration successful`)
-                                        fs.unlinkSync(`./${f}.bak`)
+                                        log('INFO', `Restoration successful`);
+                                        fs.unlinkSync(`./${f}.bak`);
                                         return;
-                                    }
-                                })
-                            }
-                        })
-                    }
-                }
-            })
+                                    };
+                                });
+                            };
+                        });
+                    };
+                };
+            });
             res.on('error', (err) => {
-                log('ERR', `Error while fetching updates: ${err.message}`)
-            })
-        })
-    })
+                log('ERR', `Error while fetching updates: ${err.message}`);
+            });
+        });
+    });
     //so much async crap in here. I just need to replace some files lol
     setTimeout(() => {//waits for everything to finish downloading or whatever
         if (needsRestart) {
             if (!bot) return;//when the bot hasn't started yet
-            log('INFO', "Restart pending - Sending shutdown message to bot...")
-            bot.send("shutdown")
+            log('INFO', "Restart pending - Sending shutdown signal...");
+            bot.send("shutdown");
             bot.once('close', () => {//not sure if this is any different from 'exit'
-                log('INFO', "Bot closed - Restarting...")
-                bot.removeAllListeners()
+                log('INFO', "Bot closed - Restarting...");
+                bot.removeAllListeners();
                 bot = null;
                 setTimeout(() => {
                     needsRestart = false;
-                    bot = child.fork("./bot.js")//wait a bit and start it back up
+                    bot = child.fork("./bot.js");//wait a bit and start it back up
                     //add listeners again
                     bot.on('disconnect', () => {
                         if (needsRestart) return; //ignore if its restarting
-                        log('WARN', "The bot unexpectedly closed! Stopping parent too...")
-                        clearInterval(updater)
-                    })
+                        log('WARN', "The bot unexpectedly closed! Stopping parent too...");
+                        clearInterval(updater);
+                    });
                     bot.on('error', (err) => {
-                        log('ERR', `Seems like the bot has crashed. ${err.name}: ${err.message}: ${err.stack}`)
-                    })
+                        log('ERR', `Seems like the bot has crashed. ${err.name}: ${err.message}: ${err.stack}`);
+                    });
                 }, 1000);
             })
         }
@@ -140,13 +143,13 @@ function checkUpdates() {
  * @param {*} message The event message
  */
 function log(type, message) {
-    let string = `[${type.toUpperCase()}](${Date.now()}) - ${message}`
+    let string = `[${type.toUpperCase()}](${Date.now()}) - ${message}`;
     if (fs.existsSync("./app.log")) {
-        fs.appendFileSync("./app.log", "\n" + string)
+        fs.appendFileSync("./app.log", "\n" + string);
     } else {
-        fs.writeFileSync("./app.log", string)
-    }
-}
+        fs.writeFileSync("./app.log", string);
+    };
+};
 
 /**
  * Checks the files and settings, and repairs them if needed. Uses the manifest to do this
@@ -155,20 +158,20 @@ function checkForRepair() {
     return new Promise((resolve, reject) => {
         let config;
         if (!fs.existsSync("./config.json")) {
-            config = {}
+            config = {};
         } else {
             config = require('./config.json');//load the current config
         }
         https.get(homeUrl + "manifest.json", (res) => {//request the file from github
-            let mData = ""
-            res.on('data', chunk => mData += chunk)
+            let mData = "";
+            res.on('data', chunk => mData += chunk);
             res.on('error', (err) => {
-                log('ERR', `Error while fetching manifest: ${err.message}`)
-                reject()
-            })
+                log('ERR', `Error while fetching manifest: ${err.message}`);
+                reject();
+            });
             res.on('end', () => {
                 if (mData == "404: Not Found") {//file not stored on github, ignore it
-                    log('WARN', "The manifest isn't on GitHub!")
+                    log('WARN', "The manifest isn't on GitHub!");
                 } else {
                     //after fetching manifest
                     let manifest = JSON.parse(mData)//JSON.parse(mdata) - switch to require() for debugging
@@ -192,30 +195,30 @@ function checkForRepair() {
                                         }
                                         fs.writeFileSync(`./${f}`, dData);
                                         log('INFO', "Done");
-                                    })
-                                })
-                            }
-                        })
-                    }
+                                    });
+                                });
+                            };
+                        });
+                    };
                     if (manifest.config) {//checks the config integrity
                         let confNew = manifest.config;
-                        let confNewNames = Object.getOwnPropertyNames(confNew)
+                        let confNewNames = Object.getOwnPropertyNames(confNew);
                         confNewNames.forEach(n => {
                             if (config[n]) {//if the setting is already there
                                 if (typeof config[n] != confNew[n].type) {//only proceed if the data type is wrong
-                                    log('WARN', `Incorrect data type found for ${n} - restoring default`)
-                                    config[n] = confNew[n].default
-                                }
+                                    log('WARN', `Incorrect data type found for ${n} - restoring default`);
+                                    config[n] = confNew[n].default;
+                                };
                             } else {//missing setting, add it
-                                log('INFO', `Adding new setting: ${n}`)
-                                config[n] = confNew[n].default
-                            }
-                        })
-                    }
-                }
-                fs.writeFileSync("./config.json", JSON.stringify(config))
-                resolve()
-            })
-        })
-    })
-}
+                                log('INFO', `Adding new setting: ${n}`);
+                                config[n] = confNew[n].default;
+                            };
+                        });
+                    };
+                };
+                fs.writeFileSync("./config.json", JSON.stringify(config));
+                resolve();
+            });
+        });
+    });
+};

@@ -6,6 +6,9 @@
         "start.sh",
         "README.md"
     ],
+    "dependencies": [
+        "discord.js"
+    ],
     "config": {
         "token": {
             "type": "string",

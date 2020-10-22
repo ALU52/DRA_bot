@@ -13,6 +13,7 @@ config.lastBoot = Date.now();
 
 /*
 There seems to be a memory leak somewhere in here - Ive narrowed it down to the queue
+Make custom objects for the queue, so unended things are filtered out
 */
 
 
@@ -369,16 +370,16 @@ var queueManager = setInterval(() => {
                 try {
                     apiFetch('account', account.key).then(r => {//copied from handlewaitresponse()
                         //I hate how volatile these responses are
-                        if (!r) log('ERR', "No response from the API")
+                        if (!r) log('ERR', "No response from the API");
                         account.guilds = r.guilds;
                         account.time = Date.now();//update account
                         r.guilds.forEach(g => {//callback for each guild the user is in
                             if (config.guilds.find(i => i.id == g)) return;//ignores guilds it already knows about
                             else {
                                 newGuild(g, account.key, r.guild_leader.includes(g));//this line makes me scream inside
-                            }
-                        })
-                    })
+                            };
+                        });
+                    });
                     roleQueue.unshift(roleQueue.pop());//moves it to the back of the queue, to be run again
                     return;
                 } catch (err) {//unlink on uncaught error
