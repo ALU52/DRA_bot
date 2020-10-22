@@ -323,8 +323,7 @@ client.on("message", (msg) => {
             //the webpage and web-to-bot API will be a workaround for this - to make up for its user unfriendliness
             //will allow an "unregistered" role to be automatically given to anybody who hasn't linked their account, among other things
 
-            //add perm filter!!!!!!!!!!!!!!!!!!!!!!
-
+            if (!msg.member.hasPermission('ADMINISTRATOR')) { msg.reply("sorry, only the server staff can use that."); return; };
             if (!args[0]) {//no args - show help page
                 msg.channel.send(settingEmbed)
                 return;
