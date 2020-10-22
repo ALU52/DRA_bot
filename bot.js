@@ -37,15 +37,18 @@ var helpEmbed = {
     }
 };
 
-var linkHelp = {
+var settingEmbed = {
     "embed": {
-        "title": "Role linking guide",
-        "description": "Each role can be linked to a seperate role within a guild. If you'd like everybody in the guild to have that role, link it to rank 0.\n**How it works:**\nThe rank number starts from the highest position, with #1 being the Leader, and the number increases as you go down the list.\nDue to API restrictions, ranks greater than 0 require the guild owner to link their account. Otherwise, I cant see which ranks exist",
-        "color": config.defaultColor,
+        "title": "Settings",
+        "description": `Usage: set <setting> <value?>\`\`\`md
+- "unregisteredRole" => a role ID given to unregistered users
+\`\`\`        
+        `,
+        "color": config.defaultColor
     }
-};
+}
 
-var setupEmbed = {
+var linkHelp = {
     "embed": {
         "title": "Setup guide",
         "description": "Here's how to link your account:\`\`\`md\n1. Go to https://account.arena.net/applications\n2. How you manage your keys is up to you, but I need to see which guilds you're in for this to work\n3. Copy the API key you'd like to use, and paste it here\`\`\`\nIf you've changed your mind, you can ignore this message or say 'cancel'",
@@ -106,7 +109,7 @@ client.on("message", (msg) => {
             if (accounts.find(a => a.id == msg.author.id)) { msg.reply("your account is already linked!"); break; }//if its already there
             else {
                 if (msg.channel.type != 'dm') msg.channel.send(`You got it, <@${msg.author.id}> !Please check your DMs`);
-                msg.author.send(setupEmbed);
+                msg.author.send(linkHelp);
                 waitList.add(msg.author.id);
             };
             break;
@@ -319,12 +322,33 @@ client.on("message", (msg) => {
             //this command is for other server-specific settings, as stored in config
             //the webpage and web-to-bot API will be a workaround for this - to make up for its user unfriendliness
             //will allow an "unregistered" role to be automatically given to anybody who hasn't linked their account, among other things
+
+            //add perm filter!!!!!!!!!!!!!!!!!!!!!!
+
+            if (!args[0]) {//no args - show help page
+                msg.channel.send(settingEmbed)
+                return;
+            }
             switch (args[0].toLowerCase()) {
                 case "unregisteredrole":
-                    if (!args[1]) {//missing argument
-
+                    if (!args[1]) {//missing argument - show current setting
+                        msg.channel.send({ embed: { "title": "Current setting", "description": `\`\`\`${config.serverSettings[msg.guild.id].unregisteredRole}\`\`\`` } })
                     } else {//args good
-
+                        if (args[1] == "clear" || args[1] == "null" || args[1] == "reset") {//reset
+                            config.serverSettings[msg.guild.id].unregisteredRole = null
+                            msg.reply("Cleared the setting")
+                            return;
+                        };
+                        let role = msg.guild.roles.cache.find(r => r.id == args[1])
+                        if (!role) { msg.reply("it looks like that role doesn't exist"); return; };
+                        prompt(msg.author, msg.channel, `This will give <@&${role.id}> to all unlinked accounts.\nProceed?`).then(r => {
+                            if (r) {
+                                config.serverSettings[msg.guild.id].unregisteredRole = role.id
+                                msg.reply("linked successfully")
+                            } else {
+                                msg.reply("action canceled")
+                            }
+                        })
                     };
                     break;
 
@@ -881,6 +905,7 @@ const server = http.createServer((req, res) => {
 
                     case "consent":
                         jsonResponse = false;
+                        //this needs to be updated
                         res.writeHead(302, { 'Location': consentUrl });
                         break;
 
