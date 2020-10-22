@@ -1,8 +1,59 @@
 {
-    "checkList": [
+    "comment": "This file is used to generate a config file. This is much better than an example config, because app.js will use this to verify the config too",
+    "files": [
         "bot.js",
         "app.js",
         "start.sh",
         "README.md"
-    ]
+    ],
+    "config": {
+        "token": {
+            "type": "string",
+            "default": ""
+        },
+        "lastBoot": {
+            "type": "number",
+            "default": 0
+        },
+        "prefix": {
+            "type": "string",
+            "default": ".gw"
+        },
+        "inviteURL": {
+            "type": "string",
+            "default": "https://discord.com/api/oauth2/authorize?client_id=763982717846159370&permissions=8&scope=bot"
+        },
+        "ownerID": {
+            "type": "string",
+            "default": "653082608871276584"
+        },
+        "cacheTime": {
+            "type": "number",
+            "default": 8.64e+7
+        },
+        "serverSettings": {
+            "type": "object",
+            "default": {}
+        },
+        "blacklist": {
+            "type": "array",
+            "defualt": []
+        },
+        "logPath": {
+            "type": "string",
+            "defualt": "./app.log"
+        },
+        "accountsPath": {
+            "type": "array",
+            "default": "./accounts.json"
+        },
+        "defaultColor": {
+            "type": "string",
+            "default": "#7289DA"
+        },
+        "guilds": {
+            "type": "array",
+            "default": []
+        }
+    }
 }
