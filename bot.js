@@ -360,7 +360,7 @@ var queAdder = setInterval(() => {//adds every account to the update que - looks
 //this is to avoid making the APIs angry with me
 let queueDelay = 500
 var queueManager = setInterval(() => {
-    if (roleQueue.size >= 1) {//only run if theres someone there
+    if (roleQueue.length >= 1) {//only run if theres someone there
         let member = roleQueue[roleQueue.length - 1];
         let account = accounts.find(a => a.id === member.user.id);
         if (account) {//first check if they're registered
@@ -658,6 +658,7 @@ const characterMap = {//this is probably the worst thing I've ever created // ca
  */
 function log(type, message) {
     let string = `[${type.toUpperCase()}](${Date.now()}) - ${message}`;
+    if (!config.logPath) return;
     if (fs.existsSync(config.logPath)) {
         fs.appendFileSync(config.logPath, "\n" + string);
     } else {
