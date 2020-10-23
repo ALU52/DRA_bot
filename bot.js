@@ -9,6 +9,9 @@ var waitList = new Set();
 
 const client = new Discord.Client();
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000" };
+const emojis = { "check": "✅", "cross": "❌", "warning": "⚠️" }
+var rateLimitMode = false;
+
 config.lastBoot = Date.now();
 
 /*
@@ -29,15 +32,23 @@ setTimeout(() => {//gives it a moment for the cache
 }, 1000);
 
 //#region Embeds
-var helpEmbed = {
+const embedHelp = {
     "embed": {
         "title": "Help",
-        "description": "My job is to integrate this server with the Gw2 API\n**Commands:**\n\`\`\`\n> Help\n> Ping\n> Link\n> Unlink\n> Stats\n> GuildList\`\`\`\n**Admin commands:**\n\`\`\`\n> roleAdd\n> roleRemove\n> roles\`\`\`",
+        "description": `${emojis.cross} Please slow down!`,
         "color": config.defaultColor,
     }
 };
 
-var settingEmbed = {
+const embedSlowDown = {
+    "embed": {
+        "title": "Help",
+        "description": "My job is to integrate this server with the Gw2 API\n**Commands:**\n\`\`\`\n> Help\n> Ping\n> Link\n> Unlink\n> Stats\n> GuildList\`\`\`\n**Admin commands:**\n\`\`\`\n> roleAdd\n> roleRemove\n> roles\`\`\`",
+        "color": colors.error,
+    }
+}
+
+const embedSettings = {
     "embed": {
         "title": "Settings",
         "description": `Usage: set <setting> <value?>\`\`\`md
@@ -48,7 +59,7 @@ var settingEmbed = {
     }
 }
 
-var linkHelp = {
+const embedLinkGuide = {
     "embed": {
         "title": "Setup guide",
         "description": "Here's how to link your account:\`\`\`md\n1. Go to https://account.arena.net/applications\n2. How you manage your keys is up to you, but I need to see which guilds you're in for this to work\n3. Copy the API key you'd like to use, and paste it here\`\`\`\nIf you've changed your mind, you can ignore this message or say 'cancel'",
@@ -80,7 +91,7 @@ client.on("message", (msg) => {
 
     switch (command) {
         case "help":
-            msg.channel.send(helpEmbed);
+            msg.channel.send(embedHelp);
             break;
 
         case "ping":
@@ -109,7 +120,7 @@ client.on("message", (msg) => {
             if (accounts.find(a => a.id == msg.author.id)) { msg.reply("your account is already linked!"); break; }//if its already there
             else {
                 if (msg.channel.type != 'dm') msg.channel.send(`You got it, <@${msg.author.id}> !Please check your DMs`);
-                msg.author.send(linkHelp);
+                msg.author.send(embedLinkGuide);
                 waitList.add(msg.author.id);
             };
             break;
@@ -120,7 +131,7 @@ client.on("message", (msg) => {
                 accounts.splice(acc);
                 msg.channel.send({
                     "embed": {
-                        "description": "✅ Your account was unlinked",
+                        "description": `${emojis.check} Your account was unlinked`,
                         "color": colors.success
                     }
                 });
@@ -158,7 +169,7 @@ client.on("message", (msg) => {
                         /////////////////////////////////////////////////
                         msg.channel.send({
                             "embed": {
-                                "description": "✅ Link successful",
+                                "description": `${emojis.check} Link successful`,
                                 "color": colors.success
                             }
                         });
@@ -194,7 +205,7 @@ client.on("message", (msg) => {
                             if (index != -1) {
                                 msg.channel.send({
                                     "embed": {
-                                        "description": `✅ <@&${links[index].role}> Was unlinked from ${g.name}`,
+                                        "description": `${emojis.check} <@&${links[index].role}> Was unlinked from ${g.name}`,
                                         "color": colors.success
                                     }
                                 });
@@ -206,7 +217,7 @@ client.on("message", (msg) => {
                     log('ERR', `Failed to delete link to ${args[0]} : ${error}`);
                     msg.channel.send({
                         "embed": {
-                            "description": "❌ Failed to unlink this role, check `rolelinks`, It might not exist",
+                            "description": `${emojis.cross} Failed to unlink this role, check 'roles', It might not exist`,
                             "color": colors.error
                         }
                     });
@@ -251,7 +262,7 @@ client.on("message", (msg) => {
             break;
 
         case "log":
-            if (args[0] == "clear" && msg.author.id == config.ownerID) { fs.writeFileSync(config.logPath, `\n[INFO](${Date.now()}) - The log was cleared`); msg.react("✅"); return; };
+            if (args[0] == "clear" && msg.author.id == config.ownerID) { fs.writeFileSync(config.logPath, `\n[INFO](${Date.now()}) - The log was cleared`); msg.react(emojis.check); return; };
             let lString;
             let lLog = fs.readFileSync(config.logPath).toString().split("\n");
             let maxLines = 80;//the absolute max lines can be printed. This will be reduced if the embed goes over the character limit
@@ -327,7 +338,7 @@ client.on("message", (msg) => {
         case "shutdown":
             //only for emergencies
             if (msg.author.id == config.ownerID) {
-                msg.react("✅").then(() => process.exit(0));
+                msg.react(emojis.check).then(() => process.exit(0));
             };
             break;
 
@@ -339,7 +350,7 @@ client.on("message", (msg) => {
 
             if (!msg.member.hasPermission('ADMINISTRATOR')) { msg.reply("sorry, only the server staff can use that."); return; };
             if (!args[0]) {//no args - show help page
-                msg.channel.send(settingEmbed)
+                msg.channel.send(embedSettings)
                 return;
             }
             switch (args[0].toLowerCase()) {
@@ -427,7 +438,7 @@ var queueManager = setInterval(() => {
                         accounts.splice(acc);
                         u.send({
                             "embed": {
-                                "description": "❌ Something went wrong when I checked your Gw2 account! It's likely the linked API key was deleted.\nTo avoid spamming the API, your account was automatically unlinked.",
+                                "description": `${emojis.cross} Something went wrong when I checked your Gw2 account! It's likely the linked API key was deleted. To avoid spamming the API, your account was automatically unlinked.`,
                                 "color": colors.error
                             }
                         });
@@ -481,7 +492,7 @@ if (!config) { log('ERR', "The bot just tried to start without a config file!");
 if (!config.token) { log('ERR', "Cannot login without a token!"); process.exit(1); };
 client.login(config.token).catch(e => log('ERR', `Failed to login. It's probably a connection issue\n${e}`));
 
-var waitlistCooldown = new Set();
+var waitCD = new Set();
 //#region Functions
 /**
  * @param {Discord.User} user The user
@@ -489,29 +500,24 @@ var waitlistCooldown = new Set();
  */
 function handleWaitResponse(user, content) {
     //to avoid spamming the API through this bot
-    if (waitlistCooldown.has(user.id)) {
-        user.send({
-            "embed": {
-                "description": "❌ Please slow down!",
-                "color": colors.error
-            }
-        });
-        waitlistCooldown.add(user.id);
+    if (waitCD.has(user.id)) {
+        user.send(embedSlowDown);
+        waitCD.add(user.id);
         setTimeout(() => {
-            waitlistCooldown.delete(user.id);
+            waitCD.delete(user.id);
         }, 3000);
         return;
     }
-    waitlistCooldown.add(user.id);
+    waitCD.add(user.id);
     setTimeout(() => {
-        waitlistCooldown.delete(user.id);
+        waitCD.delete(user.id);
     }, 1000);
 
     let txt = content.toLowerCase();
     if (txt == "cancel" || txt == "nevermind" || txt == "never mind" || txt == "stop" || txt == "no" || txt == "back" || txt == "wait no") {
         user.send({
             "embed": {
-                "description": "❌ Account link canceled",
+                "description": `${emojis.cross} Account link canceled`,
                 "color": colors.error
             }
         });
@@ -525,7 +531,7 @@ function handleWaitResponse(user, content) {
         if (r.text) {
             user.send({
                 "embed": {
-                    "description": `❌ The API replied with this:\n${r.text}`,
+                    "description": `${emojis.cross} The API replied with:\n${r.text}`,
                     "color": colors.error
                 }
             });
@@ -545,7 +551,7 @@ function handleWaitResponse(user, content) {
             log('INFO', `New link: ${user.id}`)
             user.send({
                 "embed": {
-                    "description": `✅ Successfully linked <@${user.id}> to ${r.name}`,
+                    "description": `${emojis.check} Successfully linked <@${user.id}> to ${r.name}`,
                     "color": colors.success
                 }
             });
@@ -554,7 +560,7 @@ function handleWaitResponse(user, content) {
         log("ERR", `Failed guild setup: ${err}`)
         user.send({
             "embed": {
-                "description": "❌ There was an error during setup. Did you provide a valid API key? Please DM <@" + config.ownerID + "> if you'd like help",
+                "description": `${emojis.cross} There was an error during setup. Did you provide a valid API key? Please DM <@" + config.ownerID + "> if you'd like help`,
                 "color": colors.error
             }
         });
@@ -740,9 +746,9 @@ function apiFetch(path, token) {
 function prompt(who, channel, text) {
     return new Promise(function (resolve) {
         let embed = { "embed": { "description": text, "color": colors.warning } }
-        channel.send(embed).then(m => m.react(`✅`)).then(m => m.message.react(`❌`)).then(m => {//add the reactions
+        channel.send(embed).then(m => m.react(emojis.check)).then(m => m.message.react(emojis.cross)).then(m => {//add the reactions
             let filter = (reaction, user) => {
-                return ['✅', '❌'].includes(reaction.emoji.name) && user.id === who.id;
+                return [emojis.check, emojis.cross].includes(reaction.emoji.name) && user.id === who.id;
             };
             let responded = false;
             m.message.awaitReactions(filter, { max: 1, time: 10000, errors: ['time'] }).then((collected => {//listen for a response
@@ -750,7 +756,7 @@ function prompt(who, channel, text) {
                 if (collected.size >= 1) {
                     responded = true;
                 }
-                if (reaction.emoji.name === '✅') {//makes sure its the right reaction
+                if (reaction.emoji.name === emojis.check) {//makes sure its the right reaction
                     resolve(true);
                 } else {
                     resolve(false);
