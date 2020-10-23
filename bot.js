@@ -275,7 +275,7 @@ client.on("message", (msg) => {
             let lEmbed = {
                 "embed": {
                     "description": lString,
-                    "color": config.defaultColor
+                    "color": "#25A198"
                 }
             };
             msg.channel.send(lEmbed);
