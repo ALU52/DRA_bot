@@ -252,15 +252,29 @@ client.on("message", (msg) => {
 
         case "log":
             if (args[0] == "clear" && msg.author.id == config.ownerID) { fs.writeFileSync(config.logPath, `\n[INFO](${Date.now()}) - The log was cleared`); msg.react("✅"); return; };
-            let lString = "";//this command is broken, it seems to crash the program, or completely skip the counting part
-            let lMaxLines = 20;
+            let lString = "```md";
             let lLog = fs.readFileSync(config.logPath).toString().split("\n");
-            for (let i = lLog.length; i > 0 && i > lLog.length - lMaxLines; i--) {//counts backwards from the length without exceeding the max
-                if (lLog[i]) lString += "\n" + lLog[i];//skip if empty
+            let maxLines = 80
+            //embed descriptions must be 2048 or fewer characters
+            function translate() {
+                lString = "```md"
+                if (lLog.length >= maxLines) {//trim
+                    lLog.splice(lLog.length - maxLines, lLog.length - maxLines)
+                }
+                for (let i = 0; i < lLog.length; i++) {//counts backwards from the length without exceeding the max
+                    if (lLog[i]) lString += "\n" + lLog[i];//skip if empty
+                }
             }
+            translate()
+            while (lString.length >= 2045) {//changed from 2048 to 2045 to counter for the "```" after code blocks
+                //copy fewer lines until its small enough to fit in an embed
+                maxLines--;
+                translate()
+            }
+            lString += "```"
             let lEmbed = {
                 "embed": {
-                    "description": "Newest events are at the top```md" + lString + "```",
+                    "description": lString,
                     "color": config.defaultColor
                 }
             };
