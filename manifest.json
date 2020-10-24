@@ -50,10 +50,6 @@
             "type": "string",
             "default": "./accounts.json"
         },
-        "defaultColor": {
-            "type": "string",
-            "default": "#7289DA"
-        },
         "guilds": {
             "type": "object",
             "default": []
