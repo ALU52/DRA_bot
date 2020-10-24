@@ -1,16 +1,17 @@
 const Discord = require("discord.js");
 const fs = require('fs');
 const os = require('os');
-const https = require('https');
-const http = require('http');//for gateway
+const https = require('https');//for API requests
+const http = require('http');//for website gateway - getting a certificate doesn't sound easy
 let config = require("./config.json");
 let accounts = require("./accounts.json");
-var waitList = new Set();
 
 const client = new Discord.Client();
-const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000" };
-const emojis = { "check": "✅", "cross": "❌", "warning": "⚠️" }
-var rateLimitMode = false;
+const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000", "default": "#7289DA" };
+const emojis = { "check": "✅", "cross": "❌", "warning": "⚠️", "question": "❓" }
+var rateLimitMode = false;//stops the bot for a while on rate limit
+var waitList = new Set();//list of people who need to give an API key to link
+var waitCD = new Set();//a list of people who've recently responded to a linkGuide, enforces limit so gw API doesn't get spammed by jerks
 
 config.lastBoot = Date.now();
 
@@ -32,40 +33,86 @@ setTimeout(() => {//gives it a moment for the cache
 }, 1000);
 
 //#region Embeds
-const embedHelp = {
-    "embed": {
-        "title": "Help",
-        "description": `${emojis.cross} Please slow down!`,
-        "color": config.defaultColor,
+class Embeds {
+    /**
+     * 
+     * @param {string} string The embed text
+     * @param {title=} title The embed title
+     */
+    default(string, title) {
+        if (title) {
+            return {
+                "embed": {
+                    "title": title,
+                    "description": string,
+                    "color": colors.default,
+                }
+            }
+        } else {
+            return {
+                "embed": {
+                    "description": string,
+                    "color": colors.default,
+                }
+            }
+        }
     }
-};
-
-const embedSlowDown = {
-    "embed": {
-        "title": "Help",
-        "description": "My job is to integrate this server with the Gw2 API\n**Commands:**\n\`\`\`\n> Help\n> Ping\n> Link\n> Unlink\n> Stats\n> GuildList\`\`\`\n**Admin commands:**\n\`\`\`\n> roleAdd\n> roleRemove\n> roles\`\`\`",
-        "color": colors.error,
+    slowDown() {
+        return {
+            "embed": {
+                "title": "Woah now",
+                "description": `${emojis.cross} Please slow down!`,
+                "color": colors.error,
+            }
+        }
     }
-}
-
-const embedSettings = {
-    "embed": {
-        "title": "Settings",
-        "description": `Usage: set <setting> <value?>\`\`\`md
+    help() {
+        return {
+            "embed": {
+                "title": "Help",
+                "description": "My job is to integrate this server with the Gw2 API\n**Commands:**\n\`\`\`\n> Help\n> Ping\n> Link\n> Unlink\n> Stats\n> GuildList\`\`\`\n**Admin commands:**\n\`\`\`\n> roleAdd\n> roleRemove\n> roles\`\`\`",
+                "color": colors.default,
+            }
+        }
+    }
+    settings() {
+        return {
+            "embed": {
+                "title": "Settings",
+                "description": `Usage: set <setting> <value?>\`\`\`md
 - "unregisteredRole" => a role ID given to unregistered users
-\`\`\`        
-        `,
-        "color": config.defaultColor
+        \`\`\`        
+                `,
+                "color": colors.default
+            }
+        }
+    }
+    linkGuide() {
+        return {//sent to users who use the "link" command
+            "embed": {
+                "title": "Setup guide",
+                "description": "Here's how to link your account:\`\`\`md\n1. Go to https://account.arena.net/applications\n2. How you manage your keys is up to you, but I need to see which guilds you're in for this to work\n3. Copy the API key you'd like to use, and paste it here\`\`\`\nIf you've changed your mind, you can ignore this message or say 'cancel'",
+                "color": colors.default
+            }
+        };
+    }
+    success(string) {//wraps strings in a success embed message
+        return {
+            "embed": {
+                "description": `${emojis.check} ${string}`,
+                "color": colors.success
+            }
+        }
+    }
+    error(string) {//warps strings in an error embed message
+        return {
+            "embed": {
+                "description": `${emojis.cross} ${string}`,
+                "color": colors.error
+            }
+        }
     }
 }
-
-const embedLinkGuide = {
-    "embed": {
-        "title": "Setup guide",
-        "description": "Here's how to link your account:\`\`\`md\n1. Go to https://account.arena.net/applications\n2. How you manage your keys is up to you, but I need to see which guilds you're in for this to work\n3. Copy the API key you'd like to use, and paste it here\`\`\`\nIf you've changed your mind, you can ignore this message or say 'cancel'",
-        "color": config.defaultColor
-    }
-};
 //#endregion
 
 //update embed colors with the colors object
@@ -75,12 +122,7 @@ const embedLinkGuide = {
 //#region Message handler
 client.on("message", (msg) => {
     if (msg.mentions.has(client.user, { 'ignoreDirect': false, 'ignoreEveryone': true, 'ignoreRoles': true })) {//when it's mentioned
-        msg.channel.send({
-            "embed": {
-                "description": "👋 Hey there! My prefix is `" + config.prefix + "` Use `" + config.prefix + "help` to see a list of commands",
-                "color": config.defaultColor
-            }
-        });
+        msg.channel.send(Embeds.prototype.default("👋 Hey there! My prefix is `" + config.prefix + "` Use `" + config.prefix + "help` to see a list of commands"));
     };
     if (waitList.has(msg.author.id)) { handleWaitResponse(msg.author, msg.content); return };
     //ignores bots, DMs, people on blacklist, and anything not starting with the prefix
@@ -91,11 +133,11 @@ client.on("message", (msg) => {
 
     switch (command) {
         case "help":
-            msg.channel.send(embedHelp);
+            msg.channel.send(Embeds.prototype.help());
             break;
 
         case "ping":
-            msg.reply(`Pong!\nResponse time: ${client.ws.ping} ms`);
+            msg.channel.send(Embeds.prototype.default(`Response time: ${client.ws.ping} ms`, "Pong!"))
             break;
 
         case "info":
@@ -111,16 +153,16 @@ client.on("message", (msg) => {
                     "url": "https://github.com/ALU52/DRA_bot",
                     "description":
                         `**Bot stats:**\`\`\`\n[${serverCount}/${totalUsers.size}] Registered users in this server \n[${accounts.length}] Total registered users\n[${config.guilds.length}] Total registered guilds\n[${roleQueue.length}] Users in the queue\nLast restart was ${timeDifference(config.lastBoot)}\`\`\`\n**System info:**\n\`\`\`Memory usage: ${Math.round((os.totalmem() - os.freemem()) * 1e-6)}/${Math.round(os.totalmem() * 1e-6)} MB\nPlatform: ${os.type()}\nArch: ${os.arch()}\nLast system restart was ${timeDifference(Date.now() - os.uptime() * 1000)}\`\`\``,
-                    "color": config.defaultColor,
+                    "color": colors.default,
                 }
             });
             break;
 
         case "link":
-            if (accounts.find(a => a.id == msg.author.id)) { msg.reply("your account is already linked!"); break; }//if its already there
+            if (accounts.find(a => a.id == msg.author.id)) { msg.channel.send(Embeds.prototype.error("Your account is already linked")); break; }//if its already there
             else {
-                if (msg.channel.type != 'dm') msg.channel.send(`You got it, <@${msg.author.id}> !Please check your DMs`);
-                msg.author.send(embedLinkGuide);
+                if (msg.channel.type != 'dm') msg.channel.send(Embeds.prototype.default(`You got it, <@${msg.author.id}>! Please check your DMs`));
+                msg.author.send(Embeds.prototype.linkGuide());
                 waitList.add(msg.author.id);
             };
             break;
@@ -129,104 +171,74 @@ client.on("message", (msg) => {
             let acc = accounts.findIndex(a => a.id == msg.author.id);
             if (acc != -1) {
                 accounts.splice(acc);
-                msg.channel.send({
-                    "embed": {
-                        "description": `${emojis.check} Your account was unlinked`,
-                        "color": colors.success
-                    }
-                });
+                msg.channel.send(Embeds.prototype.success("Your account was unlinked"));
             } else {
-                msg.reply("your account is not registered");
+                msg.channel.send(Embeds.prototype.error("Your account is not registered"))
             };
             break;
 
         case "roleadd":
             if (msg.channel.type == "dm") { msg.reply("this command can only be used in servers"); return; };
-            if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.reply("sorry, only the server staff can use this"); return; };
+            if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.channel.send(Embeds.prototype.error("Sorry, only the server staff can use this")); return; };
             if (args.length !== 3) {//show help message if args are wrong
-                msg.channel.send({
-                    "embed": {
-                        "description": "This command links a role to a guild to be assigned automatically\n**Usage:** roleAdd <roleID> <rank> <guildTag>\nThe rank should be a number 1-9. The rank number depends on the order in the guild. 0 will be given to every member of the guild. Otherwise, they increase with the highest rank (e.g. the leader) being #1. With the exception of #0, the highest rank = the lowest #, with the lowest rank = the highest #",
-                        "color": config.defaultColor
-                    }
-                });
+                msg.channel.send(Embeds.prototype.default("This command links a role to a guild to be assigned automatically\n**Usage:** roleAdd <roleID> <rank> <guildTag>\nThe rank should be a number 1-9. The rank number depends on the order in the guild. 0 will be given to every member of the guild. Otherwise, they increase with the highest rank (e.g. the leader) being #1. With the exception of #0, the highest rank = the lowest #, with the lowest rank = the highest #"));
                 return;
             } else {
                 //should search for the guild tag first
                 let guild = searchGuilds(args[2]);//search for the guild
-                if (!guild) { msg.reply(`I couldn't find any guilds under "${args[2]}"\nYou may have to link your account first`); return };
+                if (!guild) { Embeds.prototype.error(`I couldn't find any guilds under "${args[2]}"\nYou may have to link your account first`); return };
                 let server = guild.links[msg.guild.id];//find or create the server under the guild
                 if (!server) { guild.links[msg.guild.id] = []; server = guild.links[msg.guild.id]; };//create a new one if it doesn't exist and assign it
                 let role = msg.guild.roles.cache.find(r => r.id == args[0]);
-                let rank = parseInt(args[1]);
-                if (rank === NaN) { msg.reply(`use this command without arguments to see its usage`); return; };
-                if (!role) { msg.reply("it looks like that role doesn't exist. Please use a role ID"); return; };
+                let rank = parseInt(args[1]);//this only supports single digits - this will need to be changed later
+                if (rank === NaN) { msg.channel.send(Embeds.prototype.error(`Use this command without arguments to see its usage`)); return; };
+                if (!role) { msg.channel.send(Embeds.prototype.error("It looks like that role doesn't exist")); return; };
                 prompt(msg.author, msg.channel, `This will link <@&${role.id}> to ${guild.name}\nContinue?`).then(r => {
                     if (r) {
                         //add the role link to the server under the guild
                         let newRole = { "rank": rank, "role": role.id };
                         server.push(newRole);
                         /////////////////////////////////////////////////
-                        msg.channel.send({
-                            "embed": {
-                                "description": `${emojis.check} Link successful`,
-                                "color": colors.success
-                            }
-                        });
+                        msg.channel.send(Embeds.prototype.success(`Link successful`));
                     } else {
-                        msg.reply("action canceled");
+                        msg.channel.send(Embeds.prototype.error("Action canceled"));
                     }
                 }).catch(() => {
-                    msg.reply("action canceled");
+                    msg.channel.send(Embeds.prototype.error("Action canceled"));
                 });
             };
             break;
 
         case "roleremove":
             if (msg.channel.type == "dm") { msg.reply("this command can only be used in servers"); return; };
-            if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.reply("sorry, only the server staff can use this"); return; };
+            if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.channel.send(Embeds.prototype.error("Sorry, only the server staff can use this")); return; };
             if (args.length === 0) {//show help message
-                msg.channel.send({
-                    "embed": {
-                        "description": "This command unlinks a role from a guild\nUsage: unlink <roleID>",
-                        "color": config.defaultColor
-                    }
-                });
+                msg.channel.send(Embeds.prototype.default("This command unlinks a role from a guild\nUsage: unlink <roleID>"));
             } else {//looks like this part needs to be re-written too
                 let role = msg.guild.roles.cache.find(r => r.id == args[0]);
-                if (!role) { msg.reply("this role doesn't exist"); return; };
+                if (!role) { msg.channel.send(Embeds.prototype.error("This role doesn't exist")); return; };
                 let linkedGuilds = config.guilds.filter(g => g.links[msg.guild.id]);//filters out any guilds without links to this server
-                if (!linkedGuilds) { msg.reply("this role isn't linked to any guilds"); return; };
+                if (!linkedGuilds) { msg.channel.send(Embeds.prototype.error("This role doesn't exist")); return; };
                 try {
                     linkedGuilds.forEach(g => {
-                        let links = g.links['737353526417555506'];
+                        let links = g.links[msg.guild.id];
                         if (!links) { return; } else {
                             let index = links.findIndex(l => l.role == role.id);
                             if (index != -1) {
-                                msg.channel.send({
-                                    "embed": {
-                                        "description": `${emojis.check} <@&${links[index].role}> Was unlinked from ${g.name}`,
-                                        "color": colors.success
-                                    }
-                                });
+                                msg.channel.send(Embeds.prototype.success(`<@&${links[index].role}> Was unlinked from ${g.name}`));
                                 links.splice(index);
                             };
                         };
                     });
                 } catch (error) {
                     log('ERR', `Failed to delete link to ${args[0]} : ${error}`);
-                    msg.channel.send({
-                        "embed": {
-                            "description": `${emojis.cross} Failed to unlink this role, check 'roles', It might not exist`,
-                            "color": colors.error
-                        }
-                    });
+                    msg.channel.send(Embeds.prototype.error(`Failed to unlink this role, check 'roles', It might not exist`));
                 };
             };
             break;
 
         case "roles":
-            if (msg.channel.type == "dm") { msg.reply("this command can only be used in servers"); return; };
+            if (msg.channel.type == "dm") { msg.channel.send(Embeds.prototype.error(`This is a server only command`)); return; };
             let guilds = config.guilds.filter(g => Object.getOwnPropertyNames(g.links).includes(msg.guild.id));//find all the guilds tied to this server
             let collected = [];
             //create a list of configured roles for this server
@@ -252,13 +264,7 @@ client.on("message", (msg) => {
                     };
                 });
             };
-            msg.channel.send({//send the embed after the code block gets built
-                "embed": {
-                    "title": "Linked roles",
-                    "description": "Guild | Rank | And the role it's linked to" + linkBlock,
-                    "color": config.defaultColor,
-                }
-            });
+            msg.channel.send(Embeds.prototype.default("Guild | Rank | And the role it's linked to" + linkBlock, "Linked roles"));
             break;
 
         case "log":
@@ -286,7 +292,7 @@ client.on("message", (msg) => {
             let lEmbed = {//wrap the block in an embed
                 "embed": {
                     "description": lString,
-                    "color": "#25A198"
+                    "color": "#25A198"//different embed to match MD colors a bit
                 }
             };
             msg.channel.send(lEmbed);
@@ -295,13 +301,7 @@ client.on("message", (msg) => {
         case "guildlist":
             let gList = "";
             config.guilds.forEach(g => gList += "\n- " + g.name)
-            msg.channel.send({
-                "embed": {
-                    "title": "Registered guild list",
-                    "description": "```md\n" + gList + "```",
-                    "color": config.defaultColor
-                }
-            });
+            msg.channel.send(Embeds.prototype.default("```md\n" + gList + "```", "Registered guild list"))
             break;
 
         case "guildrefresh":
@@ -311,7 +311,6 @@ client.on("message", (msg) => {
             let rreport = "";
             let link = accounts.find(a => a.id == msg.author.id);
             //builds a report so the guild owners know it worked
-            if (!link) { msg.reply('you need to link your account before this can work'); return };
             //the rest is not implemented yet //////////////////
             break;
 
@@ -322,7 +321,7 @@ client.on("message", (msg) => {
             break;
 
         case "server":
-            if (msg.channel.type == "dm") { msg.reply("this command can only be used in servers"); return; };
+            if (msg.channel.type == "dm") { msg.channel.send(Embeds.prototype.error(`This is a server only command`)); return; };
             let s = JSON.stringify(config.serverSettings[msg.guild.id]);
             msg.channel.send("```json\n" + s + "```");
             break;
@@ -348,19 +347,19 @@ client.on("message", (msg) => {
             //the webpage and web-to-bot API will be a workaround for this - to make up for its user unfriendliness
             //will allow an "unregistered" role to be automatically given to anybody who hasn't linked their account, among other things
 
-            if (!msg.member.hasPermission('ADMINISTRATOR')) { msg.reply("sorry, only the server staff can use that."); return; };
+            if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.channel.send(Embeds.prototype.error("Sorry, only the server staff can use this")); return; };
             if (!args[0]) {//no args - show help page
-                msg.channel.send(embedSettings)
+                msg.channel.send(Embeds.prototype.settings())
                 return;
             }
             switch (args[0].toLowerCase()) {
                 case "unregisteredrole":
                     if (!args[1]) {//missing argument - show current setting
-                        msg.channel.send({ embed: { "title": "Current setting", "description": `\`\`\`${config.serverSettings[msg.guild.id].unregisteredRole}\`\`\`` } })
+                        msg.channel.send(Embeds.prototype.default(`\`\`\`${config.serverSettings[msg.guild.id].unregisteredRole}\`\`\``, "Current setting"))
                     } else {//args good
                         if (args[1] == "clear" || args[1] == "null" || args[1] == "reset") {//reset
                             config.serverSettings[msg.guild.id].unregisteredRole = null
-                            msg.reply("Cleared the setting")
+                            msg.channel.send(Embeds.prototype.success("Setting reset"))
                             return;
                         };
                         let role = msg.guild.roles.cache.find(r => r.id == args[1])
@@ -368,9 +367,9 @@ client.on("message", (msg) => {
                         prompt(msg.author, msg.channel, `This will give <@&${role.id}> to all unlinked accounts.\nProceed?`).then(r => {
                             if (r) {
                                 config.serverSettings[msg.guild.id].unregisteredRole = role.id
-                                msg.reply("linked successfully")
+                                msg.channel.send(Embeds.prototype.success("Role linked\nSet to 'null' to undo these changes"));
                             } else {
-                                msg.reply("action canceled")
+                                msg.channel.send(Embeds.prototype.error("Action canceled"));
                             }
                         })
                     };
@@ -384,7 +383,7 @@ client.on("message", (msg) => {
 
         default:
             //react with a question mark to unknown commands
-            msg.react('❓');
+            msg.react(emojis.question);
             break;
     }
 })
@@ -413,6 +412,11 @@ var queueManager = setInterval(() => {
         let member = roleQueue[roleQueue.length - 1];
         let account = accounts.find(a => a.id === member.user.id);
         if (account) {//first check if they're registered
+            if (config.serverSettings[member.guild.id].unregisteredRole != null) {//see if unregistered role exists
+                if (member.roles.cache.has(config.serverSettings[member.guild.id].unregisteredRole)) {//if they have the role
+                    member.roles.remove(config.serverSettings[member.guild.id].unregisteredRole)//remove it
+                }
+            }
             //linked, now use the cache or update it if needed
             if ((Date.now() - account.time) > config.cacheTime) {//outdated cache - update it and run the que on this account again
                 try {
@@ -436,12 +440,7 @@ var queueManager = setInterval(() => {
                     client.users.fetch(account.id).then(u => {//let the user know there was an error and their account has been unlinked
                         let acc = accounts.findIndex(a => a.id == member.id);
                         accounts.splice(acc);
-                        u.send({
-                            "embed": {
-                                "description": `${emojis.cross} Something went wrong when I checked your Gw2 account! It's likely the linked API key was deleted. To avoid spamming the API, your account was automatically unlinked.`,
-                                "color": colors.error
-                            }
-                        });
+                        u.send(Embeds.prototype.error(`${emojis.cross} Something went wrong when I checked your Gw2 account! It's likely the linked API key was deleted. To avoid spamming the API, your account was automatically unlinked.`));
                     });
                 };
             } else {//nah, the cache is still valid
@@ -466,6 +465,7 @@ var queueManager = setInterval(() => {
         } else {
             if (!config.serverSettings[member.guild.id]) return;
             if (config.serverSettings[member.guild.id].unregisteredRole != null) {
+                if (member.roles.cache.has(config.serverSettings[member.guild.id].unregisteredRole)) return;//ignore if they already have it
                 member.roles.add(config.serverSettings[member.guild.id].unregisteredRole).catch(e => {
                     log('ERR', `Failed to manage ${member.id}'s roles: ${e}`);
                 })
@@ -492,7 +492,6 @@ if (!config) { log('ERR', "The bot just tried to start without a config file!");
 if (!config.token) { log('ERR', "Cannot login without a token!"); process.exit(1); };
 client.login(config.token).catch(e => log('ERR', `Failed to login. It's probably a connection issue\n${e}`));
 
-var waitCD = new Set();
 //#region Functions
 /**
  * @param {Discord.User} user The user
@@ -501,26 +500,17 @@ var waitCD = new Set();
 function handleWaitResponse(user, content) {
     //to avoid spamming the API through this bot
     if (waitCD.has(user.id)) {
-        user.send(embedSlowDown);
-        waitCD.add(user.id);
-        setTimeout(() => {
-            waitCD.delete(user.id);
-        }, 3000);
+        user.send(Embeds.prototype.slowDown());
         return;
     }
     waitCD.add(user.id);
     setTimeout(() => {
         waitCD.delete(user.id);
-    }, 1000);
+    }, 2500);
 
     let txt = content.toLowerCase();
     if (txt == "cancel" || txt == "nevermind" || txt == "never mind" || txt == "stop" || txt == "no" || txt == "back" || txt == "wait no") {
-        user.send({
-            "embed": {
-                "description": `${emojis.cross} Account link canceled`,
-                "color": colors.error
-            }
-        });
+        user.send(Embeds.prototype.error("Account link canceled"));
         waitList.delete(user.id);
         return;
     }
@@ -529,17 +519,12 @@ function handleWaitResponse(user, content) {
     let key = content.trim();
     apiFetch('tokeninfo', key).then(r => {
         if (r.text) {
-            user.send({
-                "embed": {
-                    "description": `${emojis.cross} The API replied with:\n${r.text}`,
-                    "color": colors.error
-                }
-            });
+            user.send(Embeds.prototype.error(`The API replied with:\n${r.text}`));
             return;
         }
         if (!r.permissions.includes('guilds')) { user.send("This key is missing guild permissions. Please fix this and again."); return; };
         apiFetch('account', key).then(r => {//request for user guilds
-            accounts.push({ "id": user.id, "guilds": r.guilds, "time": Date.now(), "discordKey": null, "key": content });//add them to the account file
+            accounts.push({ "id": user.id, "guilds": r.guilds, "time": Date.now(), "oauth": {}, "key": content });//add them to the account file
             waitList.delete(user.id);//remove them from the waitlist
             r.guilds.forEach(g => {//callback for each guild the user is in
                 if (config.guilds.find(i => i.id == g)) return//ignores guilds it already knows about
@@ -549,21 +534,11 @@ function handleWaitResponse(user, content) {
             });
             //send confirmation message after its done
             log('INFO', `New link: ${user.id}`)
-            user.send({
-                "embed": {
-                    "description": `${emojis.check} Successfully linked <@${user.id}> to ${r.name}`,
-                    "color": colors.success
-                }
-            });
+            user.send(Embeds.prototype.success(`Successfully linked <@${user.id}> to ${r.name}`));
         });
     }).catch((err) => {
         log("ERR", `Failed guild setup: ${err}`)
-        user.send({
-            "embed": {
-                "description": `${emojis.cross} There was an error during setup. Did you provide a valid API key? Please DM <@" + config.ownerID + "> if you'd like help`,
-                "color": colors.error
-            }
-        });
+        user.send(Embeds.prototype.error(`There was an error during setup. Did you provide a valid API key? Please DM <@" + ${config.ownerID} + "> if you'd like help`));
         return;
     })
 }
