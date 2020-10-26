@@ -12,6 +12,7 @@ const emojis = { "check": "✅", "cross": "❌", "warning": "⚠️", "question"
 var rateLimitMode = false;//stops the bot for a while on rate limit
 var waitList = new Set();//list of people who need to give an API key to link
 var waitCD = new Set();//a list of people who've recently responded to a linkGuide, enforces limit so gw API doesn't get spammed by jerks
+var shutdownPending = false;//prevents new operation from being started when the bot is trying to restart
 
 config.lastBoot = Date.now();
 
@@ -20,6 +21,10 @@ There seems to be a memory leak somewhere in here - Ive narrowed it down to the 
 Make custom objects for the queue, so unended things are filtered out
 */
 
+
+//need to add support for guild owners of a guild already registered
+//only edit stuff
+//also migrate role links from under guilds to under servers
 
 //makes sure the server settings are up to date
 setTimeout(() => {//gives it a moment for the cache
@@ -54,6 +59,15 @@ class Embeds {
                     "description": string,
                     "color": colors.default,
                 }
+            }
+        }
+    }
+    busyRestarting() {
+        return {
+            "embed": {
+                "title": "Restart pending",
+                "description": `${emojis.cross} Sorry, I cant start any more operations right now. Try again later`,
+                "color": colors.error,
             }
         }
     }
@@ -159,6 +173,7 @@ client.on("message", (msg) => {
             break;
 
         case "link":
+            if (shutdownPending) { msg.channel.send(Embeds.prototype.busyRestarting()); return; }
             if (accounts.find(a => a.id == msg.author.id)) { msg.channel.send(Embeds.prototype.error("Your account is already linked")); break; }//if its already there
             else {
                 if (msg.channel.type != 'dm') msg.channel.send(Embeds.prototype.default(`You got it, <@${msg.author.id}>! Please check your DMs`));
@@ -305,6 +320,7 @@ client.on("message", (msg) => {
             break;
 
         case "guildrefresh":
+            if (shutdownPending) { msg.channel.send(Embeds.prototype.busyRestarting()); return; }
             //only for the guild owner. This fetches ranks and updates the cached version
             let rupdatedRanks = 0;
             let raddedRanks = 0;
@@ -410,7 +426,7 @@ let queueDelay = 500
 var queueManager = setInterval(() => {
     if (roleQueue.length >= 1) {//only run if theres someone there
         let member = roleQueue[roleQueue.length - 1];
-        let account = accounts.find(a => a.id === member.user.id);
+        let account = accounts.find(a => a.id == member.user.id);
         if (account) {//first check if they're registered
             if (config.serverSettings[member.guild.id].unregisteredRole != null) {//see if unregistered role exists
                 if (member.roles.cache.has(config.serverSettings[member.guild.id].unregisteredRole)) {//if they have the role
@@ -450,7 +466,7 @@ var queueManager = setInterval(() => {
                         guild.links[member.guild.id].forEach(l => {
                             if (!l || l == null) { roleQueue.pop(); return; };
                             if (l.rank == 0) {//automatically assign rank 0 because everybody gets them
-                                if (member.roles.cache.has(l.role)) { roleQueue.pop; return; }; //ignore if they already have it
+                                if (member.roles.cache.has(l.role)) { roleQueue.pop(); return; }; //ignore if they already have it
                                 member.roles.add(l.role, `This user is in "${guild.name}"`).catch(e => {
                                     log('ERR', `Failed to manage ${member.id}'s roles: ${e}`);
                                 });
@@ -465,7 +481,7 @@ var queueManager = setInterval(() => {
         } else {
             if (!config.serverSettings[member.guild.id]) return;
             if (config.serverSettings[member.guild.id].unregisteredRole != null) {
-                if (member.roles.cache.has(config.serverSettings[member.guild.id].unregisteredRole)) return;//ignore if they already have it
+                if (member.roles.cache.has(config.serverSettings[member.guild.id].unregisteredRole)) { roleQueue.pop(); return; };;//ignore if they already have it
                 member.roles.add(config.serverSettings[member.guild.id].unregisteredRole).catch(e => {
                     log('ERR', `Failed to manage ${member.id}'s roles: ${e}`);
                 })
@@ -578,11 +594,6 @@ function searchGuilds(query) {
     return result
 }
 
-//need to add support for guild owners of a guild already registered
-//only edit stuff
-
-
-
 /**
  * Saves a new guild
  * @param {string} id The guild ID to add
@@ -687,9 +698,10 @@ function log(type, message) {
 
 /**
 * Sends a request to the API V2 and attaches a promise to it
+* Documentation at https://wiki.guildwars2.com/wiki/API:Main
 * @param {("guild/"|"account"|"account/achievements"|"account/bank"|"account/dailycrafting"|"account/dungeons"|"account/dyes"|"account/finishers"|"account/gliders"|"account/home/cats"|"account/home/nodes"|"account/inventory"|"account/luck"|"account/mailcarriers"|"account/mapchests"|"account/masteries"|"account/mastery/points"|"account/materials"|"account/minis"|"account/mounts/skins"|"account/mounts/types"|"account/novelties"|"account/outfits"|"account/pvp/heroes"|"account/raids"|"tokeninfo"|"pvp/standings"|"pvp/games"|"pvp/stats"|"commerce/transactions"|"characters"|"account/worldbosses"|"account/wallet"|"account/titles"|"account/skins"|"account/recipes")} path The type of information to request
 * @param {string} token The API token to use
-* @returns {Promise<Object>}
+* @returns {Promise<Object>} The parsed JSON response. If a "text" property exists, it probably is an error
 */
 function apiFetch(path, token) {
     return new Promise((resolve, reject) => {
@@ -754,7 +766,6 @@ function prompt(who, channel, text) {
  * @param {number} previous The previous timestamp
  */
 function timeDifference(previous) {
-
     var msPerMinute = 60 * 1000;
     var msPerHour = msPerMinute * 60;
     var msPerDay = msPerHour * 24;
@@ -766,23 +777,18 @@ function timeDifference(previous) {
     if (elapsed < msPerMinute) {
         return Math.round(elapsed / 1000) + ' seconds ago';
     }
-
     else if (elapsed < msPerHour) {
         return Math.round(elapsed / msPerMinute) + ' minutes ago';
     }
-
     else if (elapsed < msPerDay) {
         return Math.round(elapsed / msPerHour) + ' hours ago';
     }
-
     else if (elapsed < msPerMonth) {
         return 'approximately ' + Math.round(elapsed / msPerDay) + ' days ago';
     }
-
     else if (elapsed < msPerYear) {
         return 'approximately ' + Math.round(elapsed / msPerMonth) + ' months ago';
     }
-
     else {
         return 'approximately ' + Math.round(elapsed / msPerYear) + ' years ago';
     };
@@ -843,18 +849,21 @@ process.on('uncaughtException', (err) => {
 process.on('message', (m) => {//manages communication with parent
     switch (m) {
         case "shutdown":
-            log('INFO', "Starting bot shutdown...");
+            log('INFO', "Cleaning up...");
+            shutdownPending = true;
             clearInterval(queAdder);//stop adding users to the queue
             clearInterval(scrollInterval);//stop updating presence and change to restart message
             client.user.setPresence({ status: "dnd", activity: { name: "with system files", type: "PLAYING" }, });
-            client.removeAllListeners();//stop listening for bot events
             server.removeAllListeners();//stop listening for API events
             stopBackup();//save one final time and stop writing to the files
             server.close();//close the API server
             setInterval(() => {
-                if (roleQueue.length == 0) {//shutdown conditions
-                    log('INFO', "Ready for shutdown");
-                    process.exit(0);
+                if (roleQueue.length == 0 && waitList.size == 0) {//shutdown conditions
+                    log('INFO', "Done - stopping bot");
+                    client.removeAllListeners()
+                    setTimeout(() => {
+                        process.exit(0);
+                    }, 1000);
                 };
             }, 5000);
             setTimeout(() => {//in case it hangs or something
@@ -937,4 +946,11 @@ const server = http.createServer((req, res) => {
         res.end();
     };
 }).listen(8080);
+server.on('error', (err) => {
+    log('ERR', `Internal API: ${err.name} : ${err.message} : ${err.stack}`);
+    if (err.name == "Error:listen EADDRINUSE") {
+        log('WARN', "Looks like the bot is already running - shutting down...")
+        process.exit(1)
+    }
+});
 //#endregion
