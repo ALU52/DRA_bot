@@ -6,7 +6,7 @@ const http = require('http');//for website gateway - getting a certificate doesn
 let config = require("./config.json");
 let accounts = require("./accounts.json");
 
-const client = new Discord.Client();
+const client = new Discord.Client({ fetchAllMembers: true });
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000", "default": "#7289DA" };
 const emojis = { "check": "✅", "cross": "❌", "warning": "⚠️", "question": "❓" }
 var rateLimitMode = false;//stops the bot for a while on rate limit
@@ -384,7 +384,7 @@ client.on("message", (msg) => {
             switch (args[0].toLowerCase()) {
                 case "unregisteredrole":
                     if (!args[1]) {//missing argument - show current setting
-                        msg.channel.send(Embeds.prototype.default(`\`\`\`<@&${config.serverSettings[msg.guild.id].unregisteredRole}> (${config.serverSettings[msg.guild.id].unregisteredRole})\`\`\``, "Current setting"))
+                        msg.channel.send(Embeds.prototype.default(`<@&${config.serverSettings[msg.guild.id].unregisteredRole}> (${config.serverSettings[msg.guild.id].unregisteredRole})`, "Current setting"))
                     } else {//args good
                         if (args[1] == "clear" || args[1] == "null" || args[1] == "reset") {//reset
                             config.serverSettings[msg.guild.id].unregisteredRole = null
@@ -452,17 +452,15 @@ let queueDelay = 500
 var updateRoles = setInterval(() => {
     if (roleQueue.length >= 1) {//only run if theres someone there
         let member = roleQueue[roleQueue.length - 1];
-        if (!config.serverSettings[member.guild.id].links) {//ignore if there aren't any links for this server
+        if (!config.serverSettings[member.guild.id]) {//ignore if there aren't any settings for this server
             roleQueue.pop();
             return;
         }
         let account = accounts.find(a => a.id == member.user.id);
         if (account) {//first check if they're registered
-            if (config.serverSettings[member.guild.id]) {//see if the server is configured
-                if (config.serverSettings[member.guild.id].unregisteredRole != null) {//if the role is configured
-                    if (member.roles.cache.has(config.serverSettings[member.guild.id].unregisteredRole)) {//if they have the role
-                        member.roles.remove(config.serverSettings[member.guild.id].unregisteredRole)//remove it
-                    }
+            if (config.serverSettings[member.guild.id].unregisteredRole != null) {//if the role is configured
+                if (member.roles.cache.has(config.serverSettings[member.guild.id].unregisteredRole)) {//if they have the role
+                    member.roles.remove(config.serverSettings[member.guild.id].unregisteredRole)//remove it
                 }
             }
             //linked, now use the cache or update it if needed
@@ -492,17 +490,17 @@ var updateRoles = setInterval(() => {
                     });
                 };
             } else {//nah, the cache is still valid
+                if (!config.serverSettings[member.guild.id].links) { roleQueue.pop(); return; }
                 config.serverSettings[member.guild.id].links.forEach(l => {
                     if (!l) return;
                     if (account.guilds.includes(l.guild) && !member.roles.cache.has(l.role)) {
-                        member.roles.add(l.role)
-                    }
-                })
+                        member.roles.add(l.role);
+                    };
+                });
             };
         } else {
-            if (!config.serverSettings[member.guild.id]) return;
             if (config.serverSettings[member.guild.id].unregisteredRole != null) {
-                if (member.roles.cache.has(config.serverSettings[member.guild.id].unregisteredRole)) { roleQueue.pop(); return; };;//ignore if they already have it
+                if (member.roles.cache.has(config.serverSettings[member.guild.id].unregisteredRole)) { roleQueue.pop(); return; };//ignore if they already have it
                 member.roles.add(config.serverSettings[member.guild.id].unregisteredRole).catch(e => {
                     log('ERR', `Failed to manage ${member.id}'s roles: ${e}`);
                 })
