@@ -195,7 +195,7 @@ client.on("message", (msg) => {
         case "roleadd":
             if (msg.channel.type == "dm") { msg.reply("this command can only be used in servers"); return; };
             if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.channel.send(Embeds.prototype.error("Sorry, only the server staff can use this")); return; };
-            if (args.length !== 3) {//show help message if args are wrong
+            if (args.length != 3) {//show help message if args are wrong
                 msg.channel.send(Embeds.prototype.default("This command links a role to a guild to be assigned automatically\n**Usage:** roleAdd <roleID> <rank> <guildTag>\nThe rank should be a number 1-9. The rank number depends on the order in the guild. 0 will be given to every member of the guild. Otherwise, they increase with the highest rank (e.g. the leader) being #1. With the exception of #0, the highest rank = the lowest #, with the lowest rank = the highest #"));
                 return;
             } else {
@@ -429,6 +429,13 @@ var queueUsers = setInterval(() => {//adds every account to the update que - loo
     client.guilds.cache.forEach(s => {//also updates server settings
         if (!config.serverSettings[s.id]) {//if settings are missing
             config.serverSettings[s.id] = { "unregisteredRole": null, "links": null };
+            return;
+        }
+        if (!config.serverSettings[s.id].unregisteredRole) {
+            config.serverSettings[s.id].unregisteredRole = null
+        }
+        if (!config.serverSettings[s.id].links) {
+            config.serverSettings[s.id].links = null
         }
     });
     //now add users to the queue to be checked and managed
