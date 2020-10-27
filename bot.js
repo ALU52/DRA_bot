@@ -202,8 +202,6 @@ client.on("message", (msg) => {
                 //should search for the guild tag first
                 let guild = searchGuilds(args[2]);//search for the guild
                 if (!guild) { Embeds.prototype.error(`I couldn't find any guilds under "${args[2]}"\nYou may have to link your account first`); return };
-                let server = guild.links[msg.guild.id];//find or create the server under the guild
-                if (!server) { guild.links[msg.guild.id] = []; server = guild.links[msg.guild.id]; };//create a new one if it doesn't exist and assign it
                 let role = msg.guild.roles.cache.find(r => r.id == args[0]);
                 let rank = parseInt(args[1]);//this only supports single digits - this will need to be changed later
                 if (rank === NaN) { msg.channel.send(Embeds.prototype.error(`Use this command without arguments to see its usage`)); return; };
@@ -211,8 +209,12 @@ client.on("message", (msg) => {
                 prompt(msg.author, msg.channel, `This will link <@&${role.id}> to ${guild.name}\nContinue?`).then(r => {
                     if (r) {
                         //add the role link to the server under the guild
-                        let newRole = { "rank": rank, "role": role.id };
-                        server.push(newRole);
+                        let newRole = { "rank": rank, "role": role.id, "guild": guild.id };
+                        if (!config.serverSettings[msg.guild.id].links) {//if its null and needs to be set up
+                            config.serverSettings[msg.guild.id].links = [newRole]
+                        } else {//already setup, push to it
+                            config.serverSettings[msg.guild.id].links.push(newRole)
+                        }
                         /////////////////////////////////////////////////
                         msg.channel.send(Embeds.prototype.success(`Link successful`));
                     } else {
@@ -232,19 +234,17 @@ client.on("message", (msg) => {
             } else {//looks like this part needs to be re-written too
                 let role = msg.guild.roles.cache.find(r => r.id == args[0]);
                 if (!role) { msg.channel.send(Embeds.prototype.error("This role doesn't exist")); return; };
-                let linkedGuilds = config.guilds.filter(g => g.links[msg.guild.id]);//filters out any guilds without links to this server
-                if (!linkedGuilds) { msg.channel.send(Embeds.prototype.error("This role doesn't exist")); return; };
                 try {
-                    linkedGuilds.forEach(g => {
-                        let links = g.links[msg.guild.id];
-                        if (!links) { return; } else {
-                            let index = links.findIndex(l => l.role == role.id);
-                            if (index != -1) {
-                                msg.channel.send(Embeds.prototype.success(`<@&${links[index].role}> Was unlinked from ${g.name}`));
-                                links.splice(index);
-                            };
-                        };
-                    });
+                    let remRole = config.serverSettings[msg.guild.id].links.find(r => r.role == args[0])
+                    if (!remRole) {
+                        msg.channel.send(Embeds.prototype.error("This role isn't linked to any guilds"))
+                        return;
+                    } else {
+                        let remIndex = config.serverSettings[msg.guild.id].links.findIndex(r => role == args[0])
+                        msg.channel.send(Embeds.prototype.success(`<@&${remRole.role}> was unlinked`))
+                        config.serverSettings[msg.guild.id].links.splice(remIndex)
+                        return;
+                    }
                 } catch (error) {
                     log('ERR', `Failed to delete link to ${args[0]} : ${error}`);
                     msg.channel.send(Embeds.prototype.error(`Failed to unlink this role, check 'roles', It might not exist`));
@@ -254,32 +254,29 @@ client.on("message", (msg) => {
 
         case "roles":
             if (msg.channel.type == "dm") { msg.channel.send(Embeds.prototype.error(`This is a server only command`)); return; };
-            let guilds = config.guilds.filter(g => Object.getOwnPropertyNames(g.links).includes(msg.guild.id));//find all the guilds tied to this server
             let collected = [];
             //create a list of configured roles for this server
-            guilds.forEach(g => {//for each configured guild
-                Object.getOwnPropertyNames(g.links).forEach(i => {//for each server under the guild
-                    if (i === msg.guild.id) {//if the server matches this one
-                        if (!g.links[msg.guild.id]) return;//if nothing is there
-                        let links = g.links[msg.guild.id];
-                        links.forEach(r => {//in case theres multiple roles tied to it
-                            if (r == null) return;
-                            collected.push({ "role": r.role, "rank": r.rank, "name": g.name });
-                        });
-                    };
+            if (!config.serverSettings[msg.guild.id]) {
+                msg.channel.send(Embeds.prototype.error("This server isn't registered yet! This usually means there was an error behind the scenes.\nPlease try again later"));
+            };
+            let links = config.serverSettings[msg.guild.id].links;
+            if (links) {
+                links.forEach(l => {
+                    let guild = config.guilds.find(g => g.id == l.guild);
+                    collected.push({ "name": guild.name, "rank": l.rank, "role": l.role });
                 });
-            });
-            let linkBlock = ""//the string to build for the embed
-            if (collected.length == 0) linkBlock = "```No links were found in this server```"; else {
+            }
+            let quoteBlock = ""//the string to build for the embed
+            if (collected.length == 0) quoteBlock = "```No roles are linked to guilds```"; else {
                 collected.forEach(l => {
                     if (l.rank == 0) {
-                        linkBlock += `\n> ${l.name} [Everyone] => <@&${l.role}>`
+                        quoteBlock += `\n> ${l.name} [Everyone] => <@&${l.role}>`
                     } else {
-                        linkBlock += `\n> ${l.name} [Rank: ${l.rank}] => <@&${l.role}>`
+                        quoteBlock += `\n> ${l.name} [Rank: ${l.rank}] => <@&${l.role}>`
                     };
                 });
             };
-            msg.channel.send(Embeds.prototype.default("Guild | Rank | And the role it's linked to" + linkBlock, "Linked roles"));
+            msg.channel.send(Embeds.prototype.default("Guild | Rank | And the role it's linked to" + quoteBlock, "Linked roles"));
             break;
 
         case "log":
@@ -357,6 +354,22 @@ client.on("message", (msg) => {
             };
             break;
 
+        case "reset":
+            //only for recovering from broken updates
+            if (msg.author.id == config.ownerID) {
+                prompt(msg.author, msg.channel, "This will reset all guild and server data!\nContinue?").then(r => {
+                    if (r) {
+                        let manifest = require("./manifest.json")
+                        config.guilds = manifest.config.guilds.default
+                        config.serverSettings = manifest.config.serverSettings.default
+                        msg.channel.send(Embeds.prototype.success("Data reset"))
+                    } else {
+                        msg.channel.send(Embeds.prototype.error("Action canceled"))
+                    }
+                })
+            };
+            break;
+
         case "set":
             //under construction
             //this command is for other server-specific settings, as stored in config
@@ -371,7 +384,7 @@ client.on("message", (msg) => {
             switch (args[0].toLowerCase()) {
                 case "unregisteredrole":
                     if (!args[1]) {//missing argument - show current setting
-                        msg.channel.send(Embeds.prototype.default(`\`\`\`${config.serverSettings[msg.guild.id].unregisteredRole}\`\`\``, "Current setting"))
+                        msg.channel.send(Embeds.prototype.default(`\`\`\`<@&${config.serverSettings[msg.guild.id].unregisteredRole}> (${config.serverSettings[msg.guild.id].unregisteredRole})\`\`\``, "Current setting"))
                     } else {//args good
                         if (args[1] == "clear" || args[1] == "null" || args[1] == "reset") {//reset
                             config.serverSettings[msg.guild.id].unregisteredRole = null
@@ -412,25 +425,37 @@ client.on("message", (msg) => {
 //maybe a set can solve the memory leak
 /**@type {Discord.GuildMember[]} */
 var roleQueue = []
-var queAdder = setInterval(() => {//adds every account to the update que - looks like its ignoring offline users, not sure how to fix this
+var queueUsers = setInterval(() => {//adds every account to the update que - looks like its ignoring offline users, not sure how to fix this
+    client.guilds.cache.forEach(s => {//also updates server settings
+        if (!config.serverSettings[s.id]) {//if settings are missing
+            config.serverSettings[s.id] = { "unregisteredRole": null, "links": null };
+        }
+    });
+    //now add users to the queue to be checked and managed
     if (roleQueue.length >= 10) return;//ignore if theres already a lot in there
     client.guilds.cache.forEach(g => {//does this instead of all members because it needs to manage their roles
         g.members.cache.filter(u => !u.user.bot).forEach(u => {//adds each user to the queue while excluding bots
             roleQueue.unshift(u)
         });
     });
-}, 300000);//default is 300000 - which runs every 5 minutes
+}, 60000);//default is 300000 - which runs every 5 minutes - I cranked it up though
 
 //this is to avoid making the APIs angry with me
 let queueDelay = 500
-var queueManager = setInterval(() => {
+var updateRoles = setInterval(() => {
     if (roleQueue.length >= 1) {//only run if theres someone there
         let member = roleQueue[roleQueue.length - 1];
+        if (!config.serverSettings[member.guild.id].links) {//ignore if there aren't any links for this server
+            roleQueue.pop();
+            return;
+        }
         let account = accounts.find(a => a.id == member.user.id);
         if (account) {//first check if they're registered
-            if (config.serverSettings[member.guild.id].unregisteredRole != null) {//see if unregistered role exists
-                if (member.roles.cache.has(config.serverSettings[member.guild.id].unregisteredRole)) {//if they have the role
-                    member.roles.remove(config.serverSettings[member.guild.id].unregisteredRole)//remove it
+            if (config.serverSettings[member.guild.id]) {//see if the server is configured
+                if (config.serverSettings[member.guild.id].unregisteredRole != null) {//if the role is configured
+                    if (member.roles.cache.has(config.serverSettings[member.guild.id].unregisteredRole)) {//if they have the role
+                        member.roles.remove(config.serverSettings[member.guild.id].unregisteredRole)//remove it
+                    }
                 }
             }
             //linked, now use the cache or update it if needed
@@ -460,23 +485,12 @@ var queueManager = setInterval(() => {
                     });
                 };
             } else {//nah, the cache is still valid
-                account.guilds.forEach(g => {//for each cached guild from this account
-                    let guild = config.guilds.find(cg => cg.id == g);//first find the guild in the config
-                    if (guild.links[member.guild.id]) {//if the guild has a link to the server
-                        guild.links[member.guild.id].forEach(l => {
-                            if (!l || l == null) { roleQueue.pop(); return; };
-                            if (l.rank == 0) {//automatically assign rank 0 because everybody gets them
-                                if (member.roles.cache.has(l.role)) { roleQueue.pop(); return; }; //ignore if they already have it
-                                member.roles.add(l.role, `This user is in "${guild.name}"`).catch(e => {
-                                    log('ERR', `Failed to manage ${member.id}'s roles: ${e}`);
-                                });
-                            };
-                            //
-                            // - Under construction - this next part will search for the guild ranks and assign them if needed
-                            //
-                        });
-                    };
-                });
+                config.serverSettings[member.guild.id].links.forEach(l => {
+                    if (!l) return;
+                    if (account.guilds.includes(l.guild) && !member.roles.cache.has(l.role)) {
+                        member.roles.add(l.role)
+                    }
+                })
             };
         } else {
             if (!config.serverSettings[member.guild.id]) return;
@@ -604,7 +618,7 @@ function newGuild(id, key, owner) {
     //new function must be added that also reads the guild ranks if its the guild owner
     if (!config.guilds.find(g => g.id == id)) {//ignores if its already there
         let leader;
-        let newGuild = { "aliases": [], "ranks": [], "links": {} };
+        let newGuild = { "aliases": [], "ranks": [] };
         if (!owner) leader = false; else leader = owner;
         apiFetch('guild/' + id, key).then(res => {//request more info about the guild, and register it
             newGuild.id = res.id;
@@ -615,7 +629,7 @@ function newGuild(id, key, owner) {
                 log('INFO', `Leader detected, adding ranks`);
                 apiFetch(`guild/${g}/ranks`, key).then(ranks => {
                     ranks.forEach(r => {//append each rank to the guild object
-                        newGuild.ranks.push({ "id": r.id, "order": r.order, "icon": r.icon });
+                        newGuild.ranks.push({ "id": r.id, "order": r.order });
                     })
                 }).catch(e => {
                     log('ERR', `Error while fetching ranks for ${id} : ${e}`);
@@ -816,13 +830,13 @@ client.on("ready", () => {
     setTimeout(() => {//wait for cache before updating data
         client.guilds.cache.forEach(s => {
             if (!config.serverSettings[s.id]) {//if settings are missing
-                config.serverSettings[s.id] = { "unregisteredRole": null };
+                config.serverSettings[s.id] = { "unregisteredRole": null, "links": null };
             }
         });
     }, 5000);
 });
 client.on('guildCreate', (g) => {
-    config.serverSettings[g.id] = { "unregisteredRole": null };//sets to empty settings
+    config.serverSettings[g.id] = { "unregisteredRole": null, "links": null };//sets to empty settings
 });
 client.on('guildMemberAdd', (member) => {
     let serverSettings = config.serverSettings[member.guild.id];
@@ -851,7 +865,7 @@ process.on('message', (m) => {//manages communication with parent
         case "shutdown":
             log('INFO', "Cleaning up...");
             shutdownPending = true;
-            clearInterval(queAdder);//stop adding users to the queue
+            clearInterval(queueUsers);//stop adding users to the queue
             clearInterval(scrollInterval);//stop updating presence and change to restart message
             client.user.setPresence({ status: "dnd", activity: { name: "with system files", type: "PLAYING" }, });
             server.removeAllListeners();//stop listening for API events
