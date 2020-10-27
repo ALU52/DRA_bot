@@ -6,7 +6,7 @@ const http = require('http');//for website gateway - getting a certificate doesn
 let config = require("./config.json");
 let accounts = require("./accounts.json");
 
-const client = new Discord.Client({ fetchAllMembers: true });
+const client = new Discord.Client();
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000", "default": "#7289DA" };
 const emojis = { "check": "✅", "cross": "❌", "warning": "⚠️", "question": "❓" }
 var rateLimitMode = false;//stops the bot for a while on rate limit
@@ -441,9 +441,17 @@ var queueUsers = setInterval(() => {//adds every account to the update que - loo
     //now add users to the queue to be checked and managed
     if (roleQueue.length >= 10) return;//ignore if theres already a lot in there
     client.guilds.cache.forEach(g => {//does this instead of all members because it needs to manage their roles
-        g.members.cache.filter(u => !u.user.bot).forEach(u => {//adds each user to the queue while excluding bots
-            roleQueue.unshift(u)
-        });
+        if (g.members.cache.size != g.memberCount) {//uncached users
+            g.members.fetch().then(members => {
+                members.forEach(mem => {
+                    if (!mem.user.bot) roleQueue.unshift(mem);
+                })
+            })
+        } else {//cache can be trusted
+            g.members.cache.filter(u => !u.user.bot).forEach(u => {//adds each user to the queue while excluding bots
+                roleQueue.unshift(u)
+            });
+        }
     });
 }, 60000);//default is 300000 - which runs every 5 minutes - I cranked it up though
 
