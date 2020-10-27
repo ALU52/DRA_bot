@@ -84,7 +84,7 @@ class Embeds {
         return {
             "embed": {
                 "title": "Help",
-                "description": "My job is to integrate this server with the Gw2 API\n**Commands:**\n\`\`\`\n> Help\n> Ping\n> Link\n> Unlink\n> Info\n> GuildList\`\`\`\n**Admin commands:**\n\`\`\`\n> roleAdd\n> roleRemove\n> roles\`\`\`",
+                "description": "My job is to integrate this server with the Gw2 API\n**Commands:**\n\`\`\`\n> Help\n> Ping\n> Link\n> Unlink\n> Info\`\`\`\n**Admin commands:**\n\`\`\`\n> roleAdd\n> roleRemove\n> roles\`\`\`",
                 "color": colors.default,
             }
         }
@@ -138,7 +138,7 @@ client.on("message", (msg) => {
     if (msg.mentions.has(client.user, { 'ignoreDirect': false, 'ignoreEveryone': true, 'ignoreRoles': true })) {//when it's mentioned
         msg.channel.send(Embeds.prototype.default("👋 Hey there! My prefix is `" + config.prefix + "` Use `" + config.prefix + "help` to see a list of commands"));
     };
-    if (waitList.has(msg.author.id)) { handleWaitResponse(msg.author, msg.content); return };
+    if (waitList.has(msg.author.id) && msg.channel.type == "dm") { handleWaitResponse(msg.author, msg.content); return };
     //ignores bots, DMs, people on blacklist, and anything not starting with the prefix
     if (msg.author.bot || !msg.content.startsWith(config.prefix) || config.blacklist.includes(msg.author.id)) return;
     let messageArray = msg.content.split(" ");
@@ -308,12 +308,6 @@ client.on("message", (msg) => {
                 }
             };
             msg.channel.send(lEmbed);
-            break;
-
-        case "guildlist":
-            let gList = "";
-            config.guilds.forEach(g => gList += "\n- " + g.name)
-            msg.channel.send(Embeds.prototype.default("```md\n" + gList + "```", "Registered guild list"))
             break;
 
         case "guildrefresh":
