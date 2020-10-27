@@ -424,7 +424,7 @@ client.on("message", (msg) => {
 
 //maybe a set can solve the memory leak
 /**@type {Discord.GuildMember[]} */
-var roleQueue = []
+var roleQueue = [];
 var queueUsers = setInterval(() => {//adds every account to the update que - looks like its ignoring offline users, not sure how to fix this
     client.guilds.cache.forEach(s => {//also updates server settings
         if (!config.serverSettings[s.id]) {//if settings are missing
