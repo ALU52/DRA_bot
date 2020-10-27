@@ -156,6 +156,7 @@ client.on("message", (msg) => {
 
         case "info":
             //gather up the stats
+            if (msg.channel.type == "dm") { msg.channel.send(Embeds.prototype.error("This command can only be used in servers")); return; };
             let totalUsers = msg.guild.members.cache.filter((m) => m.user.bot == false);//filters out bots
             let serverCount = 0;
             totalUsers.forEach(u => {//finds the amount of unregistered users in the server
@@ -628,7 +629,7 @@ function newGuild(id, key, owner) {
             log('INFO', `New guild registered: ` + res.name);
             if (leader) {
                 log('INFO', `Leader detected, adding ranks`);
-                apiFetch(`guild/${g}/ranks`, key).then(ranks => {
+                apiFetch(`guild/${id}/ranks`, key).then(ranks => {
                     ranks.forEach(r => {//append each rank to the guild object
                         newGuild.ranks.push({ "id": r.id, "order": r.order });
                     })
