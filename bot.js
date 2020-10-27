@@ -441,19 +441,13 @@ var queueUsers = setInterval(() => {//adds every account to the update que - loo
     //now add users to the queue to be checked and managed
     if (roleQueue.length >= 10) return;//ignore if theres already a lot in there
     client.guilds.cache.forEach(g => {//does this instead of all members because it needs to manage their roles
-        if (g.members.cache.size != g.memberCount) {//uncached users
-            g.members.fetch().then(members => {
-                members.forEach(mem => {
-                    if (!mem.user.bot) roleQueue.unshift(mem);
-                })
+        g.members.fetch({ force: true }).then(members => {//the cache cant be trusted apparently
+            members.forEach(mem => {
+                if (!mem.user.bot) roleQueue.unshift(mem)
             })
-        } else {//cache can be trusted
-            g.members.cache.filter(u => !u.user.bot).forEach(u => {//adds each user to the queue while excluding bots
-                roleQueue.unshift(u)
-            });
-        }
+        })
     });
-}, 60000);//default is 300000 - which runs every 5 minutes - I cranked it up though
+}, 60000);//fetches every minute
 
 //this is to avoid making the APIs angry with me
 let queueDelay = 500
