@@ -227,6 +227,16 @@ client.on("message", (msg) => {
             };
             break;
 
+        case "ignoreme":
+            if (config.ignoreList.includes(msg.author.id)) {
+                config.ignoreList.push(msg.author.id)
+                msg.channel.send(Embeds.prototype.success("You've been added to the ignore list"))
+            } else {
+                config.ignoreList.splice(config.findIndex(e => e == msg.author.id))
+                msg.channel.send(Embeds.prototype.success("You've been removed from the ignore list"))
+            }
+            break;
+
         case "roleremove":
             if (msg.channel.type == "dm") { msg.reply("this command can only be used in servers"); return; };
             if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.channel.send(Embeds.prototype.error("Sorry, only the server staff can use this")); return; };
@@ -442,14 +452,14 @@ var queueUsers = setInterval(() => {//adds every account to the update que - loo
             })
         })
     });
-}, 60000);//fetches every minute
+}, 300000);//fetches every minute
 
 //this is to avoid making the APIs angry with me
 let queueDelay = 500
 var updateRoles = setInterval(() => {
     if (roleQueue.length >= 1) {//only run if theres someone there
         let member = roleQueue[roleQueue.length - 1];
-        if (!config.serverSettings[member.guild.id]) {//ignore if there aren't any settings for this server
+        if (!config.serverSettings[member.guild.id] || ignoreList.includes(member.user.id)) {//ignore if there aren't any settings for this server or they chose to be ignored
             roleQueue.pop();
             return;
         }
@@ -621,7 +631,7 @@ function newGuild(id, key, owner) {
     if (!config.guilds.find(g => g.id == id)) {//ignores if its already there
         let leader;
         let newGuild = { "aliases": [], "ranks": [] };
-        if (!owner) leader = false; else leader = owner;
+        if (!owner) leader = false; else leader = owner;//makes "owner" default to false
         apiFetch('guild/' + id, key).then(res => {//request more info about the guild, and register it
             newGuild.id = res.id;
             newGuild.name = res.name;
@@ -629,8 +639,9 @@ function newGuild(id, key, owner) {
             log('INFO', `New guild registered: ` + res.name);
             if (leader) {
                 log('INFO', `Leader detected, adding ranks`);
-                apiFetch(`guild/${id}/ranks`, key).then(ranks => {
-                    ranks.forEach(r => {//append each rank to the guild object
+                apiFetch(`guild/${id}/ranks`, key).then(res => {
+                    if (!Array.isArray(res)) { log('ERR', `Got an unusual response from API while fetching ranks: ${res}`) }
+                    res.forEach(r => {//append each rank to the guild object
                         newGuild.ranks.push({ "id": r.id, "order": r.order });
                     })
                 }).catch(e => {
