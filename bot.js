@@ -15,6 +15,7 @@ var waitCD = new Set();//a list of people who've recently responded to a linkGui
 var shutdownPending = false;//prevents new operation from being started when the bot is trying to restart
 
 config.lastBoot = Date.now();
+if (!config.ignoreList) config.ignoreList = [];
 
 /*
 There seems to be a memory leak somewhere in here - Ive narrowed it down to the queue
@@ -135,6 +136,7 @@ class Embeds {
 
 //#region Message handler
 client.on("message", (msg) => {
+    if (rateLimitMode) return;
     if (msg.mentions.has(client.user, { 'ignoreDirect': false, 'ignoreEveryone': true, 'ignoreRoles': true })) {//when it's mentioned
         msg.channel.send(Embeds.prototype.default("👋 Hey there! My prefix is `" + config.prefix + "` Use `" + config.prefix + "help` to see a list of commands"));
     };
@@ -824,6 +826,7 @@ function timeDifference(previous) {
 
 //#region Events
 let scrollInterval;
+let dataCheck
 let msn = 0;
 client.on("ready", () => {
     console.clear();
@@ -840,7 +843,7 @@ client.on("ready", () => {
         client.user.setPresence(scroll[msn]);
         if (msn >= scroll.length - 1) msn = 0; else msn++;
     }, 135000);
-    setTimeout(() => {//wait for cache before updating data
+    dataCheck = setTimeout(() => {//wait for cache before updating data
         client.guilds.cache.forEach(s => {
             if (!config.serverSettings[s.id]) {//if settings are missing
                 config.serverSettings[s.id] = { "unregisteredRole": null, "links": null };
@@ -866,6 +869,13 @@ client.on('disconnect', () => {
 })
 client.on('warn', (warn) => {
     log('WARN', warn);
+})
+client.on('rateLimit', (data) => {
+    log('WARN', `Ratelimit: ${data.route} / ${data.path} : ${data.method} - ignoring messages for a sec`)
+    rateLimitMode = true;
+    setTimeout(() => {
+        rateLimitMode = false;
+    }, 2500);
 })
 client.on('error', (err) => {
     log('ERR', `Uncaught exception: ${err.name}:${err.message} - ${err.stack}`);
