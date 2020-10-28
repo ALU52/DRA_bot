@@ -229,13 +229,32 @@ client.on("message", (msg) => {
             };
             break;
 
-        case "ignoreme":
-            if (config.ignoreList.includes(msg.author.id)) {
-                config.ignoreList.push(msg.author.id)
-                msg.channel.send(Embeds.prototype.success("You've been added to the ignore list"))
-            } else {
-                config.ignoreList.splice(config.findIndex(e => e == msg.author.id))
-                msg.channel.send(Embeds.prototype.success("You've been removed from the ignore list"))
+        case "ignore":
+            if (msg.channel.type == "dm") { msg.reply("this command can only be used in servers"); return; };
+            if (!args[0]) { msg.channel.send(Embeds.prototype.default("Please specify 'me' or a user ID")); return; }
+            if (args[0].toLowerCase() == "me") {//msg author
+                if (config.ignoreList.includes(msg.author.id)) {//remove them
+                    config.ignoreList.splice(config.ignoreList.findIndex(e => e == msg.author.id))
+                    msg.channel.send(Embeds.prototype.success("You've been removed from the ignore list"))
+                } else {//not already there - add them
+                    config.ignoreList.push(msg.author.id)
+                    msg.channel.send(Embeds.prototype.success("You've been added to the ignore list"))
+                }
+            } else if (args[0].toLowerCase() == "clear") {//owner clear mode
+                if (msg.author.id != config.ownerID) { msg.react(emojis.cross); return; };
+                config.ignoreList = [];
+                msg.react(emojis.check);
+            } else {//someone else
+                let iMem = msg.guild.members.cache.find(m => m.id == args[0]);//find user
+                if (!iMem) { msg.channel.send(Embeds.prototype.error("Unknown user ID")); return; };//no user
+                if (!(msg.member.permissions.has('ADMINISTRATOR') || msg.member.permissions.has('MANAGE_ROLES'))) { msg.channel.send(Embeds.prototype.error("Sorry, only the server staff can use this")); return; };//perm filter
+                if (config.ignoreList.includes(iMem.id)) {//already on it, now remove them
+                    config.ignoreList.splice(config.ignoreList.findIndex(e => e == iMem.id))//splIce
+                    msg.channel.send(Embeds.prototype.success(`<@${iMem.id}> was removed from the ignore list`))
+                } else {//add them
+                    config.ignoreList.push(iMem.id)//push
+                    msg.channel.send(Embeds.prototype.success(`<@${iMem.id}> was added to the ignore list`))
+                }
             }
             break;
 
