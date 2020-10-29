@@ -5,6 +5,7 @@ const https = require('https');//for API requests
 const http = require('http');//for website gateway - getting a certificate doesn't sound easy
 let config = require("./config.json");
 let accounts = require("./accounts.json");
+const { object } = require("prop-types");
 
 const client = new Discord.Client();
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000", "default": "#7289DA" };
@@ -13,6 +14,7 @@ var rateLimitMode = false;//stops the bot for a while on rate limit
 var waitList = new Set();//list of people who need to give an API key to link
 var waitCD = new Set();//a list of people who've recently responded to a linkGuide, enforces limit so gw API doesn't get spammed by jerks
 var shutdownPending = false;//prevents new operation from being started when the bot is trying to restart
+let manifest
 
 config.lastBoot = Date.now();
 if (!config.ignoreList) config.ignoreList = [];
@@ -22,21 +24,9 @@ There seems to be a memory leak somewhere in here - Ive narrowed it down to the 
 Make custom objects for the queue, so unended things are filtered out
 */
 
-
 //need to add support for guild owners of a guild already registered
 //only edit stuff
-//also migrate role links from under guilds to under servers
 
-//makes sure the server settings are up to date
-setTimeout(() => {//gives it a moment for the cache
-    let map = Object.getOwnPropertyNames(config.serverSettings);
-    client.guilds.cache.forEach(g => {
-        if (!map.includes(g.id)) {//if its not there
-            log('INFO', `Adding settings for ${g.id}`);
-            config.serverSettings[g.id] = { "unregisteredRole": null };//add blank settings
-        };
-    });
-}, 1000);
 
 //#region Embeds
 class Embeds {
@@ -59,6 +49,24 @@ class Embeds {
                 "embed": {
                     "description": string,
                     "color": colors.default,
+                }
+            }
+        }
+    }
+    /**
+     * 
+     * @param {Discord.User} warnedUser The user that's being warned
+     */
+    noProfanity(warnedUser) {
+        return {
+            "embed": {
+                "title": "Oops!",
+                "description": `${emojis.cross} Please don't use that type of language here.`,
+                "color": colors.error,
+                "timestamp": Date.now(),
+                "author": {
+                    "name": warnedUser.username,
+                    "icon_url": warnedUser.avatarURL()
                 }
             }
         }
@@ -137,12 +145,32 @@ class Embeds {
 //#region Message handler
 client.on("message", (msg) => {
     if (rateLimitMode) return;
-    if (msg.mentions.has(client.user, { 'ignoreDirect': false, 'ignoreEveryone': true, 'ignoreRoles': true })) {//when it's mentioned
+    if (msg.mentions.has(client.user, { 'ignoreDirect': false, 'ignoreEveryone': true, 'ignoreRoles': true }) && msg.content.length <= 25) {//when it's mentioned
         msg.channel.send(Embeds.prototype.default("👋 Hey there! My prefix is `" + config.prefix + "` Use `" + config.prefix + "help` to see a list of commands"));
     };
-    if (waitList.has(msg.author.id) && msg.channel.type == "dm") { handleWaitResponse(msg.author, msg.content); return };
-    //ignores bots, DMs, people on blacklist, and anything not starting with the prefix
-    if (msg.author.bot || !msg.content.startsWith(config.prefix) || config.blacklist.includes(msg.author.id)) return;
+    if (waitList.has(msg.author.id) && msg.channel.type == "dm") { handleWaitResponse(msg.author, msg.content); return };//handle when people reply to the link guide if they're on the waitlist
+    //handle profanity
+    if (msg.channel.type == 'text' && !msg.author.bot && msg.content != '') {//filter out non applicable channels to filter
+        if (config.serverSettings[msg.guild.id].blockProfanity) {//if the server is set to block profanity
+            let textToFilter = normalizeString(msg.content)
+            let match = false;
+            config.wordBlacklist.forEach(w => {//for each word
+                if (textToFilter.includes(w)) {//if its a word match and it can take action
+                    match = true;
+                }
+            })
+            if (match && msg.deletable) {//if its a match and the bot can take action
+                msg.delete({ reason: "The profanity filter was violated" }).then(() => {
+                    msg.channel.send(Embeds.prototype.noProfanity(msg.author))
+                    return;
+                }).catch((r) => {
+                    log('ERR', `Unable to enforce profanity filter: ${r}`)
+                })
+            }
+        }
+    }
+
+    if (msg.author.bot || !msg.content.startsWith(config.prefix) || config.blacklist.includes(msg.author.id)) return;//ignores bots, DMs, people on blacklist, and anything not starting with the prefix
     let messageArray = msg.content.split(" ");
     let command = messageArray[0].substring(config.prefix.length).toLowerCase();
     const args = messageArray.slice(1);
@@ -231,7 +259,7 @@ client.on("message", (msg) => {
 
         case "ignore":
             if (msg.channel.type == "dm") { msg.reply("this command can only be used in servers"); return; };
-            if (!args[0]) { msg.channel.send(Embeds.prototype.default("Please specify 'me' or a user ID")); return; }
+            if (!args[0]) { msg.channel.send(Embeds.prototype.default("Please specify 'me' or a user ID")); return; };
             if (args[0].toLowerCase() == "me") {//msg author
                 if (config.ignoreList.includes(msg.author.id)) {//remove them
                     config.ignoreList.splice(config.ignoreList.findIndex(e => e == msg.author.id))
@@ -383,16 +411,28 @@ client.on("message", (msg) => {
         case "reset":
             //only for recovering from broken updates
             if (msg.author.id == config.ownerID) {
-                prompt(msg.author, msg.channel, "This will reset all guild and server data!\nContinue?").then(r => {
-                    if (r) {
-                        let manifest = require("./manifest.json")
-                        config.guilds = manifest.config.guilds.default
-                        config.serverSettings = manifest.config.serverSettings.default
-                        msg.channel.send(Embeds.prototype.success("Data reset"))
-                    } else {
-                        msg.channel.send(Embeds.prototype.error("Action canceled"))
+                if (args[0]) {
+                    if (args[0].toLowerCase() == "accounts") {
+                        prompt(msg.author, msg.channel, "This will unlink all accounts!\nContinue?").then(r => {
+                            if (r) {
+                                accounts = [];
+                                msg.channel.send(Embeds.prototype.success("Data reset"))
+                            } else {
+                                msg.channel.send(Embeds.prototype.error("Action canceled"))
+                            }
+                        })
                     }
-                })
+                } else {
+                    prompt(msg.author, msg.channel, "This will reset all guild and server data!\nContinue?").then(r => {
+                        if (r) {
+                            config.guilds = manifest.config.guilds.default
+                            config.serverSettings = manifest.config.serverSettings.default
+                            msg.channel.send(Embeds.prototype.success("Data reset"))
+                        } else {
+                            msg.channel.send(Embeds.prototype.error("Action canceled"))
+                        }
+                    })
+                }
             };
             break;
 
@@ -410,15 +450,19 @@ client.on("message", (msg) => {
             switch (args[0].toLowerCase()) {
                 case "unregisteredrole":
                     if (!args[1]) {//missing argument - show current setting
-                        msg.channel.send(Embeds.prototype.default(`<@&${config.serverSettings[msg.guild.id].unregisteredRole}> (${config.serverSettings[msg.guild.id].unregisteredRole})`, "Current setting"))
+                        if (!config.serverSettings[msg.guild.id].muteRole) {
+                            msg.channel.send(Embeds.prototype.default("This setting is empty"))
+                        } else {
+                            msg.channel.send(Embeds.prototype.default(`<@&${config.serverSettings[msg.guild.id].muteRole}> (${config.serverSettings[msg.guild.id].muteRole})`, "Current setting"))
+                        }
                     } else {//args good
                         if (args[1] == "clear" || args[1] == "null" || args[1] == "reset") {//reset
-                            config.serverSettings[msg.guild.id].unregisteredRole = null
+                            config.serverSettings[msg.guild.id].unregisteredRole = ""
                             msg.channel.send(Embeds.prototype.success("Setting reset"))
                             return;
                         };
                         let role = msg.guild.roles.cache.find(r => r.id == args[1])
-                        if (!role) { msg.reply("it looks like that role doesn't exist"); return; };
+                        if (!role) { msg.channel.send(Embeds.prototype.error("That tole doesn't exist")); return; };
                         prompt(msg.author, msg.channel, `This will give <@&${role.id}> to all unlinked accounts.\nProceed?`).then(r => {
                             if (r) {
                                 config.serverSettings[msg.guild.id].unregisteredRole = role.id
@@ -430,7 +474,53 @@ client.on("message", (msg) => {
                     };
                     break;
 
+                case "muterole":
+                    if (!args[1]) {//missing argument - show current setting
+                        if (!config.serverSettings[msg.guild.id].muteRole) {
+                            msg.channel.send(Embeds.prototype.default("This setting is empty"))
+                        } else {
+                            msg.channel.send(Embeds.prototype.default(`<@&${config.serverSettings[msg.guild.id].muteRole}> (${config.serverSettings[msg.guild.id].muteRole})`, "Current setting"))
+                        }
+                    } else {//args good
+                        if (args[1] == "clear" || args[1] == "null" || args[1] == "reset") {//reset
+                            config.serverSettings[msg.guild.id].muteRole = ""
+                            msg.channel.send(Embeds.prototype.success("Setting reset"))
+                            return;
+                        };
+                        let role = msg.guild.roles.cache.find(r => r.id == args[1])
+                        if (!role) { msg.channel.send(Embeds.prototype.error("That tole doesn't exist")); return; };
+                        prompt(msg.author, msg.channel, `This will set <@&${role.id}> as the role to mute with.\nProceed?`).then(r => {
+                            if (r) {
+                                config.serverSettings[msg.guild.id].muteRole = role.id
+                                msg.channel.send(Embeds.prototype.success("Role linked\nSet to 'null' to undo these changes"));
+                            } else {
+                                msg.channel.send(Embeds.prototype.error("Action canceled"));
+                            }
+                        })
+                    };
+                    break;
+
+                case "blockprofanity":
+                    if (!args[1]) {//show current setting
+                        msg.channel.send(Embeds.prototype.default(`\`\`\`${config.serverSettings[msg.guild.id].blockProfanity}\`\`\``, "Current setting"))
+                    } else {
+                        if (args[1] == "off" || args[1] == "false" || args[1] == "reset") {//reset 
+                            config.serverSettings[msg.guild.id].blockProfanity = false
+                            msg.channel.send(Embeds.prototype.success("Profanity filter disabled"))
+                            return;
+                        } else if (args[1] == "on" || args[1] == "true") {
+                            config.serverSettings[msg.guild.id].blockProfanity = true
+                            msg.channel.send(Embeds.prototype.success("Profanity filter enabled"))
+                            return;
+                        } else {
+                            msg.channel.send(Embeds.prototype.default("This setting can only be 'true' or 'false'", "Invalid syntax"))
+                            return;
+                        }
+                    }
+                    break;
+
                 default:
+                    msg.channel.send(Embeds.prototype.error("Unknown setting"))
                     break;
             }
 
@@ -452,35 +542,26 @@ client.on("message", (msg) => {
 /**@type {Discord.GuildMember[]} */
 var roleQueue = [];
 var queueUsers = setInterval(() => {//adds every account to the update que - looks like its ignoring offline users, not sure how to fix this
-    client.guilds.cache.forEach(s => {//also updates server settings
-        if (!config.serverSettings[s.id]) {//if settings are missing
-            config.serverSettings[s.id] = { "unregisteredRole": null, "links": null };
-            return;
-        }
-        if (!config.serverSettings[s.id].unregisteredRole) {
-            config.serverSettings[s.id].unregisteredRole = null
-        }
-        if (!config.serverSettings[s.id].links) {
-            config.serverSettings[s.id].links = null
-        }
-    });
-    //now add users to the queue to be checked and managed
     if (roleQueue.length >= 10) return;//ignore if theres already a lot in there
-    client.guilds.cache.forEach(g => {//does this instead of all members because it needs to manage their roles
-        g.members.fetch({ force: true }).then(members => {//the cache cant be trusted apparently
+    client.guilds.cache.forEach(g => {//needs to fetch all members, not users
+        g.members.fetch().then(members => {//try fetching first
             members.forEach(mem => {
-                if (!mem.user.bot) roleQueue.unshift(mem)
-            })
-        })
+                if (!mem.user.bot) roleQueue.unshift(mem);
+            });
+        }).catch((r) => {//failed to fetch, use cache instead
+            g.members.cache.forEach(mem => {
+                if (!mem.user.bot) roleQueue.unshift(mem);
+            });
+        });
     });
-}, 300000);//fetches every minute
+}, 300000);//fetches every 5 minutes
 
 //this is to avoid making the APIs angry with me
 let queueDelay = 500
 var updateRoles = setInterval(() => {
     if (roleQueue.length >= 1) {//only run if theres someone there
         let member = roleQueue[roleQueue.length - 1];
-        if (!config.serverSettings[member.guild.id] || ignoreList.includes(member.user.id)) {//ignore if there aren't any settings for this server or they chose to be ignored
+        if (!config.serverSettings[member.guild.id] || config.ignoreList.includes(member.user.id)) {//ignore if there aren't any settings for this server or they chose to be ignored
             roleQueue.pop();
             return;
         }
@@ -488,7 +569,11 @@ var updateRoles = setInterval(() => {
         if (account) {//first check if they're registered
             if (config.serverSettings[member.guild.id].unregisteredRole != null) {//if the role is configured
                 if (member.roles.cache.has(config.serverSettings[member.guild.id].unregisteredRole)) {//if they have the role
-                    member.roles.remove(config.serverSettings[member.guild.id].unregisteredRole)//remove it
+                    member.roles.remove(config.serverSettings[member.guild.id].unregisteredRole).catch(e => {//remove it
+                        log('ERR', `Failed to manage ${member.id}'s roles: ${e}`);
+                        roleQueue.pop();
+                        return;
+                    });
                 }
             }
             //linked, now use the cache or update it if needed
@@ -512,35 +597,82 @@ var updateRoles = setInterval(() => {
                     //massive error scope because lots could go wrong in the part above
                     log(`ERR`, `Error while checking ${member.id}, unlinked their account. \n${err}`);
                     client.users.fetch(account.id).then(u => {//let the user know there was an error and their account has been unlinked
-                        let acc = accounts.findIndex(a => a.id == member.id);
+                        let acc = accounts.findIndex(a => a.id == u.id);
                         accounts.splice(acc);
                         u.send(Embeds.prototype.error(`${emojis.cross} Something went wrong when I checked your Gw2 account! It's likely the linked API key was deleted. To avoid spamming the API, your account was automatically unlinked.`));
-                    });
+                    }).catch((err) => {
+                        log('ERR', `Error while unlinking an account for a different error:\n${err.name} : ${err.message}`)
+                    })
+                    roleQueue.pop();
+                    return;
                 };
             } else {//nah, the cache is still valid
                 if (!config.serverSettings[member.guild.id].links) { roleQueue.pop(); return; }
                 config.serverSettings[member.guild.id].links.forEach(l => {
                     if (!l) return;
                     if (account.guilds.includes(l.guild) && !member.roles.cache.has(l.role)) {
-                        member.roles.add(l.role);
+                        //this part cant be finished until I find a way to check everyones rank inside a guild
+                        member.roles.add(l.role).catch(e => {
+                            log('ERR', `Failed to manage ${member.id}'s roles: ${e}`);
+                        });
+                        roleQueue.pop();
+                        return;
                     };
                 });
             };
-        } else {
+        } else {//unregistered account
             if (config.serverSettings[member.guild.id].unregisteredRole != null) {
                 if (member.roles.cache.has(config.serverSettings[member.guild.id].unregisteredRole)) { roleQueue.pop(); return; };//ignore if they already have it
                 member.roles.add(config.serverSettings[member.guild.id].unregisteredRole).catch(e => {
                     log('ERR', `Failed to manage ${member.id}'s roles: ${e}`);
-                })
+                });
             }
+            roleQueue.pop();
+            return;
         }
-        roleQueue.pop();//remove from queue after its done
     }
 }, queueDelay);
 //file backup
 let backup = setInterval(() => {//saves the accounts to the file every 5 seconds
+    manifest = require("./manifest.json")//time to load up the manifest again
+    //verify config before saving it
+    Object.getOwnPropertyNames(config).forEach(en => {//check data types
+        if (!manifest.config[en]) return;//ignore if its not on the manifest for some reason
+        if (typeof config[en] != manifest.config[en].type) {
+            log('WARN', `Found wrong data type for ${en}! Restoring default`)
+            config[en] = manifest.config[en].default
+        }
+    })
+    Object.getOwnPropertyNames(manifest.config).forEach(en => {//now look for missing settings
+        if (!config[en]) {//if its gone
+            config[en] = manifest.config[en].default//bring it back!
+        }
+    })
+    //now save it
     fs.writeFileSync(config.accountsPath, JSON.stringify(accounts));
     fs.writeFileSync("./config.json", JSON.stringify(config));
+    let svConf = manifest.serverSettings//load up server specific settings
+    client.guilds.cache.forEach(s => {//for each server
+        if (!config.serverSettings[s.id]) {//if settings are missing
+            let newConf = {}//create new settings object
+            Object.getOwnPropertyNames(svConf).forEach(c => {//for each setting from manifest
+                newConf[c] = svConf[c].default//copy data from the manifest over
+            })
+            config.serverSettings[s] = newConf//save it
+            return;
+        }
+        Object.getOwnPropertyNames(config.serverSettings[s.id]).forEach(ss => {//check existing settings for each server
+            if (typeof config.serverSettings[s.id][ss] != svConf[ss].type) {//if its the wrong data type
+                log('WARN', `Wrong data type found for ${s.id}/${ss}`)
+                config.serverSettings[s.id][ss] = svConf[ss].default
+            }
+        })
+        Object.getOwnPropertyNames(svConf).forEach(ss => {//check if any new settings need to be added
+            if (!config.serverSettings[s.id][ss]) {//if its missing
+                config.serverSettings[s.id][ss] = svConf[ss].default
+            }
+        })
+    });
 }, 5000);
 function stopBackup() {
     clearInterval(backup)//stop the timer
@@ -587,7 +719,7 @@ function handleWaitResponse(user, content) {
         }
         if (!r.permissions.includes('guilds')) { user.send("This key is missing guild permissions. Please fix this and again."); return; };
         apiFetch('account', key).then(r => {//request for user guilds
-            accounts.push({ "id": user.id, "guilds": r.guilds, "time": Date.now(), "oauth": {}, "key": content });//add them to the account file
+            accounts.push({ "id": user.id, "gwid": r.id, "name": r.name, "guilds": r.guilds, "time": Date.now(), "oauth": {}, "key": content });//add them to the account file
             waitList.delete(user.id);//remove them from the waitlist
             r.guilds.forEach(g => {//callback for each guild the user is in
                 if (config.guilds.find(i => i.id == g)) return//ignores guilds it already knows about
@@ -598,6 +730,7 @@ function handleWaitResponse(user, content) {
             //send confirmation message after its done
             log('INFO', `New link: ${user.id}`)
             user.send(Embeds.prototype.success(`Successfully linked <@${user.id}> to ${r.name}`));
+            //linked, now search for all the guilds they're in and immediately add them to the queue
         });
     }).catch((err) => {
         log("ERR", `Failed guild setup: ${err}`)
@@ -651,7 +784,7 @@ function newGuild(id, key, owner) {
     //new function must be added that also reads the guild ranks if its the guild owner
     if (!config.guilds.find(g => g.id == id)) {//ignores if its already there
         let leader;
-        let newGuild = { "aliases": [], "ranks": [] };
+        let newGuild = { "aliases": [], "ranks": [{ "id": "Everyone", "order": 0 }], "leader": null };
         if (!owner) leader = false; else leader = owner;//makes "owner" default to false
         apiFetch('guild/' + id, key).then(res => {//request more info about the guild, and register it
             newGuild.id = res.id;
@@ -659,6 +792,8 @@ function newGuild(id, key, owner) {
             newGuild.tag = res.tag;
             log('INFO', `New guild registered: ` + res.name);
             if (leader) {
+                let l = accounts.find(a => a.key == key)//finds the linked account via key
+                if (l) newGuild.leader = l.id;
                 log('INFO', `Leader detected, adding ranks`);
                 apiFetch(`guild/${id}/ranks`, key).then(res => {
                     if (!Array.isArray(res)) { log('ERR', `Got an unusual response from API while fetching ranks: ${res}`) }
@@ -688,11 +823,16 @@ function normalizeString(string) {
     let result = '';
     let key = Object.getOwnPropertyNames(characterMap);
     string.split('').forEach(l => {
+        let f = false;
         for (let i = 0; i < key.length; i++) {//cycles through each part of the map until it found a mach for the letter
             if (characterMap[key[i]].includes(l)) {//if that part of the map has the letter correct character in it
                 result += key[i];
+                f = true
                 return;
             }
+        }
+        if (!f) {
+            result += " "
         }
     })
     return result;
@@ -700,14 +840,14 @@ function normalizeString(string) {
 //#region String collections
 const characterMap = {//this is probably the worst thing I've ever created // cases are separated because I'm not sure how lenient string.includes() is
     'a': ['A', 'a', 'À', 'Á', 'Â', 'Ã', 'Ä', 'Å', 'Æ', 'æ', 'ä'],
-    'b': ['B', 'b', 'ß', 'ç', 'Ć', 'ć', 'Ĉ', 'ĉ', 'Ċ', 'ċ', 'Č', 'č'],
-    'c': ['C', 'c', 'ç', 'Ć', 'ć', 'Ĉ', 'ĉ', 'Ċ', 'ċ', 'Č', 'č'],
+    'b': ['B', 'b', 'ß'],
+    'c': ['C', 'c', 'ç', 'Ć', 'ć', 'Ĉ', 'ĉ', 'Ċ', 'ċ', 'Č', 'č', '<'],
     'd': ['D', 'd', 'Ď', 'ď', 'Đ', 'đ'],
-    'e': ['E', 'e', 'È', 'É', 'Ê', 'Ë', 'è', 'é', 'ê', 'ë', 'Æ', "æ"],
+    'e': ['E', 'e', 'È', 'É', 'Ê', 'Ë', 'è', 'é', 'ê', 'ë', 'Æ', 'æ'],
     'f': ['F', 'f'],
     'g': ['G', 'g', 'Ĝ', 'ĝ', 'Ğ', 'ğ', 'Ġ', 'ġ', 'Ģ', 'ģ'],
     'h': ['H', 'h', 'Ĥ', 'ĥ', 'Ħ', 'ħ'],
-    'i': ['I', 'i', 'Ì', 'Í', 'Î', 'Ï', 'ĳ', 'Ĳ', 'ï'],
+    'i': ['I', 'i', 'Ì', 'Í', 'Î', 'Ï', 'ĳ', 'Ĳ', 'ï', '1'],
     'j': ['J', 'j', 'ĳ', 'Ĵ', 'ĵ', 'Ĳ'],
     'k': ['K', 'k', 'Ķ', 'ķ', 'ĸ'],
     'l': ['L', 'l', 'Ĺ', 'ĺ', 'Ļ', 'ļ', 'Ľ', 'ľ', 'Ŀ', 'ŀ', 'Ł', 'ł'],
@@ -862,16 +1002,6 @@ client.on("ready", () => {
         client.user.setPresence(scroll[msn]);
         if (msn >= scroll.length - 1) msn = 0; else msn++;
     }, 135000);
-    dataCheck = setTimeout(() => {//wait for cache before updating data
-        client.guilds.cache.forEach(s => {
-            if (!config.serverSettings[s.id]) {//if settings are missing
-                config.serverSettings[s.id] = { "unregisteredRole": null, "links": null };
-            }
-        });
-    }, 5000);
-});
-client.on('guildCreate', (g) => {
-    config.serverSettings[g.id] = { "unregisteredRole": null, "links": null };//sets to empty settings
 });
 client.on('guildMemberAdd', (member) => {
     let serverSettings = config.serverSettings[member.guild.id];
@@ -906,13 +1036,13 @@ process.on('message', (m) => {//manages communication with parent
     switch (m) {
         case "shutdown":
             log('INFO', "Cleaning up...");
-            shutdownPending = true;
+            shutdownPending = true;//tells the rest of the bot not to start any new operations
             clearInterval(queueUsers);//stop adding users to the queue
             clearInterval(scrollInterval);//stop updating presence and change to restart message
             client.user.setPresence({ status: "dnd", activity: { name: "with system files", type: "PLAYING" }, });
             server.removeAllListeners();//stop listening for API events
-            stopBackup();//save one final time and stop writing to the files
             server.close();//close the API server
+            stopBackup();//save one final time and stop writing to the files
             setInterval(() => {
                 if (roleQueue.length == 0 && waitList.size == 0) {//shutdown conditions
                     log('INFO', "Done - stopping bot");
