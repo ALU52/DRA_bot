@@ -104,6 +104,8 @@ class Embeds {
                 "title": "Settings",
                 "description": `Usage: set <setting> <value?>\`\`\`md
 - "unregisteredRole" => a role ID given to unregistered users
+- "muterole" => a role ID to mute people with
+- "blockprofanity" => whether profanity should be deleted (false by default)
         \`\`\`        
                 `,
                 "color": colors.default
