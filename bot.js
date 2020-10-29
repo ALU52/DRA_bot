@@ -5,7 +5,6 @@ const https = require('https');//for API requests
 const http = require('http');//for website gateway - getting a certificate doesn't sound easy
 let config = require("./config.json");
 let accounts = require("./accounts.json");
-const { object } = require("prop-types");
 
 const client = new Discord.Client();
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000", "default": "#7289DA" };
