@@ -18,13 +18,13 @@
             "type": "string",
             "default": ""
         },
-        "links": {
-            "type": "object",
-            "default": []
-        },
         "blockProfanity": {
             "type": "boolean",
             "default": false
+        },
+        "links": {
+            "type": "object",
+            "default": []
         }
     },
     "config": {
@@ -34,7 +34,25 @@
         },
         "wordBlacklist": {
             "type": "object",
-            "default": []
+            "default": [
+                "shit",
+                "fuck",
+                "nigga",
+                "nigger",
+                "boobies",
+                "booby",
+                "tits",
+                "bitch",
+                "dick",
+                "coon",
+                "cock",
+                "anus",
+                "anal",
+                "boner",
+                "cum",
+                "cunt",
+                "raghead"
+            ]
         },
         "lastBoot": {
             "type": "number",
