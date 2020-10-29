@@ -151,7 +151,7 @@ client.on("message", (msg) => {
     };
     if (waitList.has(msg.author.id) && msg.channel.type == "dm") { handleWaitResponse(msg.author, msg.content); return };//handle when people reply to the link guide if they're on the waitlist
     //handle profanity
-    if (msg.channel.type == 'text' && !msg.author.bot && msg.content != '') {//filter out non applicable channels to filter
+    if (msg.channel.type == 'text' && !msg.author.bot && msg.content != '' && !msg.system) {//filter out non applicable channels to filter
         if (config.serverSettings[msg.guild.id].blockProfanity) {//if the server is set to block profanity
             let textToFilter = normalizeString(msg.content)
             let match = false;
