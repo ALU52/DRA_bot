@@ -9,10 +9,32 @@
     "dependencies": [
         "discord.js"
     ],
+    "serverSettings": {
+        "unregisteredRole": {
+            "type": "string",
+            "default": ""
+        },
+        "muteRole": {
+            "type": "string",
+            "default": ""
+        },
+        "links": {
+            "type": "object",
+            "default": []
+        },
+        "blockProfanity": {
+            "type": "boolean",
+            "default": false
+        }
+    },
     "config": {
         "token": {
             "type": "string",
             "default": ""
+        },
+        "wordBlacklist": {
+            "type": "object",
+            "default": []
         },
         "lastBoot": {
             "type": "number",
