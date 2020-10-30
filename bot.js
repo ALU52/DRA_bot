@@ -824,23 +824,18 @@ function normalizeString(string) {
     let result = '';
     let key = Object.getOwnPropertyNames(characterMap);
     string.split('').forEach(l => {
-        let f = false;
         for (let i = 0; i < key.length; i++) {//cycles through each part of the map until it found a mach for the letter
             if (characterMap[key[i]].includes(l)) {//if that part of the map has the letter correct character in it
                 result += key[i];
-                f = true
                 return;
             }
-        }
-        if (!f) {
-            result += " "
         }
     })
     return result;
 };
 //#region String collections
 const characterMap = {//this is probably the worst thing I've ever created // cases are separated because I'm not sure how lenient string.includes() is
-    'a': ['A', 'a', 'À', 'Á', 'Â', 'Ã', 'Ä', 'Å', 'Æ', 'æ', 'ä'],
+    'a': ['A', 'a', 'À', 'Á', 'Â', 'Ã', 'Ä', 'Å', 'Æ', 'æ', 'ä', 'Д'],
     'b': ['B', 'b', 'ß'],
     'c': ['C', 'c', 'ç', 'Ć', 'ć', 'Ĉ', 'ĉ', 'Ċ', 'ċ', 'Č', 'č', '<'],
     'd': ['D', 'd', 'Ď', 'ď', 'Đ', 'đ'],
@@ -848,12 +843,12 @@ const characterMap = {//this is probably the worst thing I've ever created // ca
     'f': ['F', 'f'],
     'g': ['G', 'g', 'Ĝ', 'ĝ', 'Ğ', 'ğ', 'Ġ', 'ġ', 'Ģ', 'ģ'],
     'h': ['H', 'h', 'Ĥ', 'ĥ', 'Ħ', 'ħ'],
-    'i': ['I', 'i', 'Ì', 'Í', 'Î', 'Ï', 'ĳ', 'Ĳ', 'ï', '1'],
+    'i': ['I', 'i', 'Ì', 'Í', 'Î', 'Ï', 'ĳ', 'Ĳ', 'ï', '1', 'ǀ', 'Ǐ', 'ǐ'],
     'j': ['J', 'j', 'ĳ', 'Ĵ', 'ĵ', 'Ĳ'],
     'k': ['K', 'k', 'Ķ', 'ķ', 'ĸ'],
     'l': ['L', 'l', 'Ĺ', 'ĺ', 'Ļ', 'ļ', 'Ľ', 'ľ', 'Ŀ', 'ŀ', 'Ł', 'ł'],
     'm': ['M', 'm'],
-    'n': ['N', 'n', 'Ń', 'ń', 'Ņ', 'ņ', 'Ň', 'ň', 'ŉ', 'Ŋ', 'ŋ'],
+    'n': ['N', 'n', 'Ń', 'ń', 'Ņ', 'ņ', 'Ň', 'ň', 'ŉ', 'Ŋ', 'ŋ', 'И'],
     'o': ['O', 'o', 'Ō', 'ō', 'Ŏ', 'ŏ', 'Ő', 'ő', 'Œ', 'œ'],
     'p': ['P', 'p'],
     'q': ['Q', 'q'],
@@ -865,8 +860,7 @@ const characterMap = {//this is probably the worst thing I've ever created // ca
     'w': ['W', 'w', 'Ŵ', 'ŵ'],
     'x': ['X', 'x'],
     'y': ['Y', 'y', 'Ŷ', 'ŷ', 'Ÿ'],
-    'z': ['Z', 'z', 'Ź', 'ź', 'Ż', 'ż', 'Ž', 'ž'],
-    ' ': [' ']
+    'z': ['Z', 'z', 'Ź', 'ź', 'Ż', 'ż', 'Ž', 'ž']
 };
 //#endregion
 

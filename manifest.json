@@ -1,5 +1,5 @@
 {
-    "comment": "This file is used to generate a config file. This is much better than an example config, because app.js will use this to verify the config too",
+    "comment": "This file tells the app what everything should look like",
     "files": [
         "bot.js",
         "app.js",
@@ -36,7 +36,11 @@
             "type": "object",
             "default": [
                 "shit",
+                "feck",
+                "tf",
+                "bastard",
                 "fuck",
+                "fack",
                 "nigga",
                 "nigger",
                 "boobies",
