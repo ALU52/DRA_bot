@@ -616,10 +616,10 @@ var updateRoles = setInterval(() => {
                         member.roles.add(l.role).catch(e => {
                             log('ERR', `Failed to manage ${member.id}'s roles: ${e}`);
                         });
-                        roleQueue.pop();
-                        return;
                     };
                 });
+                roleQueue.pop();
+                return;
             };
         } else {//unregistered account
             if (config.serverSettings[member.guild.id].unregisteredRole != null) {
@@ -631,6 +631,8 @@ var updateRoles = setInterval(() => {
             roleQueue.pop();
             return;
         }
+        //anything below this line should show up as 'unreachable.' We want it that way ;)
+        console.log('test')
     }
 }, queueDelay);
 //file backup
