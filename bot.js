@@ -88,12 +88,110 @@ class Embeds {
             }
         }
     }
-    help() {
-        return {
-            "embed": {
-                "title": "Help",
-                "description": "My job is to integrate this server with the Gw2 API\n**Commands:**\n\`\`\`\n> Help\n> Ping\n> Link\n> Unlink\n> Info\`\`\`\n**Admin commands:**\n\`\`\`\n> roleAdd\n> roleRemove\n> roles\`\`\`",
-                "color": colors.default,
+    /**
+     * Returns an embed for general help, or a specific command when provided
+     * @param {string=} section The command to see help for
+     */
+    help(section) {
+        if (!section) {
+            return {
+                "embed": {
+                    "title": "Help",
+                    "description": "My job is to integrate this server with the Gw2 API\nUse 'help <command>' to see more info about it\n**Commands:**\n\`\`\`\n> Help\n> Ping\n> Link\n> Unlink\n> Info\`\`\`\n**Admin commands:**\n\`\`\`\n> roleAdd\n> roleRemove\n> roles\`\`\`",
+                    "color": colors.default,
+                }
+            }
+        } else {
+            switch (section.toLowerCase()) {
+                case "help":
+                    let hResp = [`"You're mocking me, aren't you"`, "Bruh...", "Idiot lol...", "No. Get rekt...", "Too bad...", "lol thats funny...", "Thats funny...", "I hope you're kidding...", "Say sike right now...", "Thats kinda sus...", "...", "I hope that's a joke...", "You're spamming this to see all the responses, aren't you...", "Dude...", "Seriously?", "What the H-E double C?", "No. Get hecked...", "Hahahahahaha **no**...", "Dang bro you got the whole squad laughing...", "Why are you like this?", "You must be bored as hell...", "Too bad LOL...", "How did you make it this far on Discord?"]
+                    let hNum = Math.round(Math.random() * hResp.length)
+                    return {//a little easter egg
+                        "embed": {
+                            "description": `You want a description for the help command?\n*${hResp[hNum]}*`,
+                            "color": colors.default,
+                        }
+                    }
+                    break;
+
+                case "ping":
+                    return {
+                        "embed": {
+                            "title": "Ping",
+                            "description": "This command shows the connection speed to Discord on my end.",
+                            "color": colors.default,
+                        }
+                    }
+                    break;
+
+                case "link":
+                    return {
+                        "embed": {
+                            "title": "Link",
+                            "description": "This command will start the linking process for your Gw2 account. You'll receive a DM when this command is used.",
+                            "color": colors.default,
+                        }
+                    }
+                    break;
+
+                case "unlink":
+                    return {
+                        "embed": {
+                            "title": "Unlink",
+                            "description": "If your Gw2 account is linked, this command will erase all local data for it.",
+                            "color": colors.default,
+                        }
+                    }
+                    break;
+
+                case "info":
+                    return {
+                        "embed": {
+                            "title": "Info",
+                            "description": "Displays helpful information, mostly for debugging.",
+                            "color": colors.default,
+                        }
+                    }
+                    break;
+                ///////////////////////////////////////////////////////////////////////// WORK IN PROGRESS
+                case "roleadd":
+                    return {
+                        "embed": {
+                            "title": "roleAdd",
+                            "description": "This topic is under construction",
+                            "color": colors.error,//dont forget to change the color back
+                        }
+                    }
+                    break;
+
+                case "roleremove":
+                    return {
+                        "embed": {
+                            "title": "roleRemove",
+                            "description": "This topic is under construction",
+                            "color": colors.error,
+                        }
+                    }
+                    break;
+                ////////////////////////////////////////////////////////////////////////////////////
+                case "roles":
+                    return {
+                        "embed": {
+                            "title": "Roles",
+                            "description": "Displays all the linked roles and a bit of info for each one.",
+                            "color": colors.default,
+                        }
+                    }
+                    break;
+
+                default:
+                    return {
+                        "embed": {
+                            "description": "That topic doesn't exist",
+                            "color": colors.error,
+                        }
+                    }
+                    break;
             }
         }
     }
@@ -178,7 +276,11 @@ client.on("message", (msg) => {
 
     switch (command) {
         case "help":
-            msg.channel.send(Embeds.prototype.help());
+            if (args[0]) {//topic specified
+                msg.channel.send(Embeds.prototype.help(args[0]));
+            } else {//default embed
+                msg.channel.send(Embeds.prototype.help());
+            }
             break;
 
         case "ping":
