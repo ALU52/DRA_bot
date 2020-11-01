@@ -5,10 +5,11 @@
         "app.js",
         "start.sh",
         "README.md",
-        "images/profanity.png"
+        "profanity.png"
     ],
     "dependencies": [
-        "discord.js"
+        "discord.js",
+        "bad-words"
     ],
     "serverSettings": {
         "unregisteredRole": {

@@ -252,17 +252,21 @@ client.on("message", (msg) => {
     };
     if (waitList.has(msg.author.id) && msg.channel.type == "dm") { handleWaitResponse(msg.author, msg.content); return };//handle when people reply to the link guide if they're on the waitlist
     if (msg.content && config.serverSettings[msg.guild.id].blockProfanity && msg.deletable && !msg.author.bot) {//check for profanity - ignore if no action can be taken
-        if (filter.isProfane(msg.content) && config.serverSettings[msg.guild.id].webhooks.find(w => w.channel == msg.channel.id)) {//if theres a bad word and a webhook is setup
+        if (filter.isProfane(msg.content) && config.serverSettings[msg.guild.id].webhooks != []) {//if theres a bad word and a webhook is setup
             msg.delete({ "reason": "This message violated the profanity filter" })//delete the message ASAP
-            let hook = config.serverSettings[msg.guild.id].webhooks.find(w => w.channel == msg.channel.id)
             let newString = filter.clean(msg.content)
-            client.fetchWebhook(hook.id).then(webhook => {
-                if (msg.member.nickname) {
-                    webhook.send(newString, { avatarURL: msg.author.avatarURL(), username: msg.member.nickname })//nickname mode
-                } else {
-                    webhook.send(newString, { avatarURL: msg.author.avatarURL(), username: msg.author.username })//normal mode
-                }
-            })
+            let hook = config.serverSettings[msg.guild.id].webhooks.find(w => w.channel == msg.channel.id)
+            if (hook) {
+                client.fetchWebhook(hook.id).then(webhook => {
+                    if (msg.member.nickname) {
+                        webhook.send(newString, { avatarURL: msg.author.avatarURL(), username: msg.member.nickname })//nickname mode
+                    } else {
+                        webhook.send(newString, { avatarURL: msg.author.avatarURL(), username: msg.author.username })//normal mode
+                    }
+                }).catch((err) => {
+                    log('ERR', "Failed to enforce profanity filter: " + err.message)
+                })
+            }
         }
     }
     if (msg.author.bot || !msg.content.startsWith(config.prefix) || config.blacklist.includes(msg.author.id) || msg.system || msg.webhookID) return;//ignores bots, DMs, people on blacklist, and anything not starting with the prefix
@@ -633,12 +637,10 @@ client.on("message", (msg) => {
                                 if (r) {
                                     if (msg.guild.me.hasPermission('MANAGE_WEBHOOKS')) {
                                         if (!config.serverSettings[msg.guild.id].webhooks) config.serverSettings[msg.guild.id].webhooks = []//start setup
-                                        let avatar = fs.readFileSync("./images/profanity.png")
                                         msg.guild.channels.cache.filter(c => c.type == 'text').forEach(ch => {//only fetch text channels
-                                            client.channels.fetch(ch.id).then(channel => {//fetch and create webhook
-                                                channel.createWebhook("Profanity filter: #" + ch.name, { "avatar": "./images/profanity.png", "reason": "Filter enabled by " + msg.author.username }).then(webhook => {
+                                            client.channels.fetch(ch.id, true).then(channel => {//fetch and create webhook - use cache to avoid ratelimit
+                                                channel.createWebhook("Profanity filter: #" + ch.name, { "avatar": "./profanity.png", "reason": "Filter enabled by " + msg.author.username }).then(webhook => {
                                                     config.serverSettings[msg.guild.id].webhooks.push({ "channel": webhook.channelID, "id": webhook.id, "url": webhook.url })
-                                                    console.log(JSON.stringify(webhook))
                                                 }).catch((err) => {
                                                     log('ERR', `Failed to create webhook: ${err.message}`)
                                                     config.serverSettings[msg.guild.id].blockProfanity = false
@@ -1182,7 +1184,7 @@ process.on('message', (m) => {//manages communication with parent
             shutdownPending = true;//tells the rest of the bot not to start any new operations
             clearInterval(queueUsers);//stop adding users to the queue
             clearInterval(scrollInterval);//stop updating presence and change to restart message
-            client.user.setPresence({ status: "dnd", activity: { name: "with system files", type: "PLAYING" }, });
+            if (client.user) client.user.setPresence({ status: "dnd", activity: { name: "with system files", type: "PLAYING" }, });
             server.removeAllListeners();//stop listening for API events
             server.close();//close the API server
             stopBackup();//save one final time and stop writing to the files
