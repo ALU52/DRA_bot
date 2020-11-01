@@ -36,23 +36,6 @@
             "type": "string",
             "default": ""
         },
-        "wordBlacklist": {
-            "type": "object",
-            "default": [
-                "shit",
-                "fuck",
-                "bastard",
-                "nigga",
-                "nigger",
-                "bitch",
-                "ass",
-                "dick",
-                "coon",
-                "cock",
-                "cunt",
-                "raghead"
-            ]
-        },
         "lastBoot": {
             "type": "number",
             "default": 0
