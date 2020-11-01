@@ -754,9 +754,9 @@ var updateRoles = setInterval(() => {
                     return;
                 };
             } else {//nah, the cache is still valid
-                if (!config.serverSettings[member.guild.id].links) { roleQueue.pop(); return; }
+                if (!config.serverSettings[member.guild.id].links || config.serverSettings[member.guild.id].links == []) { roleQueue.pop(); return; }
                 config.serverSettings[member.guild.id].links.forEach(l => {
-                    if (!l) return;
+                    if (!l || typeof l.role != 'string') return;
                     if (account.guilds.includes(l.guild) && !member.roles.cache.has(l.role)) {
                         //this part cant be finished until I find a way to check everyones rank inside a guild
                         member.roles.add(l.role).catch(e => {

@@ -4,7 +4,8 @@
         "bot.js",
         "app.js",
         "start.sh",
-        "README.md"
+        "README.md",
+        "images/profanity.png"
     ],
     "dependencies": [
         "discord.js"
