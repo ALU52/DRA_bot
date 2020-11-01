@@ -253,20 +253,22 @@ client.on("message", (msg) => {
     if (waitList.has(msg.author.id) && msg.channel.type == "dm") { handleWaitResponse(msg.author, msg.content); return };//handle when people reply to the link guide if they're on the waitlist
     if (msg.content && config.serverSettings[msg.guild.id].blockProfanity && msg.deletable && !msg.author.bot) {//check for profanity - ignore if no action can be taken
         if (filter.isProfane(msg.content) && config.serverSettings[msg.guild.id].webhooks != []) {//if theres a bad word and a webhook is setup
-            msg.delete({ "reason": "This message violated the profanity filter" })//delete the message ASAP
             let newString = filter.clean(msg.content)
             let hook = config.serverSettings[msg.guild.id].webhooks.find(w => w.channel == msg.channel.id)
+            let name;
+            if (msg.member.nickname) {
+                name = msg.member.nickname;
+            } else {
+                msg.author.username;
+            }
             if (hook) {
                 client.fetchWebhook(hook.id).then(webhook => {
-                    if (msg.member.nickname) {
-                        webhook.send(newString, { avatarURL: msg.author.avatarURL(), username: msg.member.nickname })//nickname mode
-                    } else {
-                        webhook.send(newString, { avatarURL: msg.author.avatarURL(), username: msg.author.username })//normal mode
-                    }
+                    webhook.send(newString, { avatarURL: msg.author.avatarURL(), username: msg.author.username })//send the embed with the censored message
                 }).catch((err) => {
                     log('ERR', "Failed to enforce profanity filter: " + err.message)
                 })
             }
+            msg.delete({ "reason": "This message violated the profanity filter", 'timeout': 100 })//delete the message ASAP
         }
     }
     if (msg.author.bot || !msg.content.startsWith(config.prefix) || config.blacklist.includes(msg.author.id) || msg.system || msg.webhookID) return;//ignores bots, DMs, people on blacklist, and anything not starting with the prefix
@@ -639,7 +641,7 @@ client.on("message", (msg) => {
                                         if (!config.serverSettings[msg.guild.id].webhooks) config.serverSettings[msg.guild.id].webhooks = []//start setup
                                         msg.guild.channels.cache.filter(c => c.type == 'text').forEach(ch => {//only fetch text channels
                                             client.channels.fetch(ch.id, true).then(channel => {//fetch and create webhook - use cache to avoid ratelimit
-                                                channel.createWebhook("Profanity filter: #" + ch.name, { "avatar": "./profanity.png", "reason": "Filter enabled by " + msg.author.username }).then(webhook => {
+                                                channel.createWebhook("Profanity filter: #" + ch.name, { "avatar": "https://raw.githubusercontent.com/ALU52/DRA_bot/master/profanity.png", "reason": "Filter enabled by " + msg.author.username }).then(webhook => {
                                                     config.serverSettings[msg.guild.id].webhooks.push({ "channel": webhook.channelID, "id": webhook.id, "url": webhook.url })
                                                 }).catch((err) => {
                                                     log('ERR', `Failed to create webhook: ${err.message}`)
@@ -1010,7 +1012,7 @@ const characterMap = {//this is probably the worst thing I've ever created // ca
     'w': ['W', 'w', 'Ŵ', 'ŵ'],
     'x': ['X', 'x'],
     'y': ['Y', 'y', 'Ŷ', 'ŷ', 'Ÿ'],
-    'z': ['Z', 'z', 'Ź', 'ź', 'Ż', 'ż', 'Ž', 'ž']
+    'z': ['Z', 'z', 'Ź', 'ź', 'Ż', 'ż', '��', 'ž']
 };
 //#endregion
 
