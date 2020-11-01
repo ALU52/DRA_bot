@@ -6,6 +6,9 @@ const http = require('http');//for website gateway - getting a certificate doesn
 let config = require("./config.json");
 let accounts = require("./accounts.json");
 
+var Filter = require('bad-words');
+var filter = new Filter({ exclude: ["damn", "hell"] });
+
 const client = new Discord.Client();
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000", "default": "#7289DA" };
 const emojis = { "check": "✅", "cross": "❌", "warning": "⚠️", "question": "❓" }
@@ -248,28 +251,21 @@ client.on("message", (msg) => {
         msg.channel.send(Embeds.prototype.default("👋 Hey there! My prefix is `" + config.prefix + "` Use `" + config.prefix + "help` to see a list of commands"));
     };
     if (waitList.has(msg.author.id) && msg.channel.type == "dm") { handleWaitResponse(msg.author, msg.content); return };//handle when people reply to the link guide if they're on the waitlist
-    //handle profanity
-    if (msg.channel.type == 'text' && !msg.author.bot && msg.content != '' && !msg.system) {//filter out non applicable channels to filter
-        if (config.serverSettings[msg.guild.id].blockProfanity) {//if the server is set to block profanity
-            let textToFilter = normalizeString(msg.content)
-            let match = false;
-            config.wordBlacklist.forEach(w => {//for each word
-                if (textToFilter.includes(w)) {//if its a word match and it can take action
-                    match = true;
+    if (msg.content && config.serverSettings[msg.guild.id].blockProfanity && msg.deletable && !msg.author.bot) {//check for profanity - ignore if no action can be taken
+        if (filter.isProfane(msg.content) && config.serverSettings[msg.guild.id].webhooks.find(w => w.channel == msg.channel.id)) {//if theres a bad word and a webhook is setup
+            msg.delete({ "reason": "This message violated the profanity filter" })//delete the message ASAP
+            let hook = config.serverSettings[msg.guild.id].webhooks.find(w => w.channel == msg.channel.id)
+            let newString = filter.clean(msg.content)
+            client.fetchWebhook(hook.id).then(webhook => {
+                if (msg.member.nickname) {
+                    webhook.send(newString, { avatarURL: msg.author.avatarURL(), username: msg.member.nickname })//nickname mode
+                } else {
+                    webhook.send(newString, { avatarURL: msg.author.avatarURL(), username: msg.author.username })//normal mode
                 }
             })
-            if (match && msg.deletable) {//if its a match and the bot can take action
-                msg.delete({ reason: "The profanity filter was violated" }).then(() => {
-                    msg.channel.send(Embeds.prototype.noProfanity(msg.author))
-                    return;
-                }).catch((r) => {
-                    log('ERR', `Unable to enforce profanity filter: ${r}`)
-                })
-            }
         }
     }
-
-    if (msg.author.bot || !msg.content.startsWith(config.prefix) || config.blacklist.includes(msg.author.id)) return;//ignores bots, DMs, people on blacklist, and anything not starting with the prefix
+    if (msg.author.bot || !msg.content.startsWith(config.prefix) || config.blacklist.includes(msg.author.id) || msg.system || msg.webhookID) return;//ignores bots, DMs, people on blacklist, and anything not starting with the prefix
     let messageArray = msg.content.split(" ");
     let command = messageArray[0].substring(config.prefix.length).toLowerCase();
     const args = messageArray.slice(1);
@@ -352,10 +348,10 @@ client.on("message", (msg) => {
                         /////////////////////////////////////////////////
                         msg.channel.send(Embeds.prototype.success(`Link successful`));
                     } else {
-                        msg.channel.send(Embeds.prototype.error("Action canceled"));
+                        msg.channel.send(Embeds.prototype.error("No changes were made"));
                     }
                 }).catch(() => {
-                    msg.channel.send(Embeds.prototype.error("Action canceled"));
+                    msg.channel.send(Embeds.prototype.error("No changes were made"));
                 });
             };
             break;
@@ -521,7 +517,7 @@ client.on("message", (msg) => {
                                 accounts = [];
                                 msg.channel.send(Embeds.prototype.success("Data reset"))
                             } else {
-                                msg.channel.send(Embeds.prototype.error("Action canceled"))
+                                msg.channel.send(Embeds.prototype.error("No changes were made"))
                             }
                         })
                     }
@@ -532,7 +528,7 @@ client.on("message", (msg) => {
                             config.serverSettings = manifest.config.serverSettings.default
                             msg.channel.send(Embeds.prototype.success("Data reset"))
                         } else {
-                            msg.channel.send(Embeds.prototype.error("Action canceled"))
+                            msg.channel.send(Embeds.prototype.error("No changes were made"))
                         }
                     })
                 }
@@ -571,7 +567,7 @@ client.on("message", (msg) => {
                                 config.serverSettings[msg.guild.id].unregisteredRole = role.id
                                 msg.channel.send(Embeds.prototype.success("Role linked\nSet to 'null' to undo these changes"));
                             } else {
-                                msg.channel.send(Embeds.prototype.error("Action canceled"));
+                                msg.channel.send(Embeds.prototype.error("No changes were made"));
                             }
                         })
                     };
@@ -597,7 +593,7 @@ client.on("message", (msg) => {
                                 config.serverSettings[msg.guild.id].muteRole = role.id
                                 msg.channel.send(Embeds.prototype.success("Role linked\nSet to 'null' to undo these changes"));
                             } else {
-                                msg.channel.send(Embeds.prototype.error("Action canceled"));
+                                msg.channel.send(Embeds.prototype.error("No changes were made"));
                             }
                         })
                     };
@@ -608,12 +604,60 @@ client.on("message", (msg) => {
                         msg.channel.send(Embeds.prototype.default(`\`\`\`${config.serverSettings[msg.guild.id].blockProfanity}\`\`\``, "Current setting"))
                     } else {
                         if (args[1] == "off" || args[1] == "false" || args[1] == "reset") {//reset 
+                            if (!config.serverSettings[msg.guild.id].blockProfanity) {//stops if its already setup
+                                msg.channel.send(Embeds.prototype.error("This feature is already disabled"));
+                                return;
+                            }
                             config.serverSettings[msg.guild.id].blockProfanity = false
+                            msg.guild.fetchWebhooks().then(hooks => {//fetch all hooks
+                                hooks.forEach(hook => {//for each
+                                    let ind = config.serverSettings[msg.guild.id].webhooks.findIndex(h => h.id == hook.id)//find the hook under the server object
+                                    if (ind != -1) {//if it exists
+                                        hook.delete(`${msg.author.username} disabled the profanity filter`).then(() => {//delete the webhook
+                                            config.serverSettings[msg.guild.id].webhooks.splice(ind)//remove from internal storage
+                                        }).catch((err) => {
+                                            msg.channel.send(Embeds.prototype.error("Failed to delete the webhooks! Please check my permissions and try again"))
+                                            return;
+                                        })
+                                    }
+                                })
+                            })
                             msg.channel.send(Embeds.prototype.success("Profanity filter disabled"))
                             return;
                         } else if (args[1] == "on" || args[1] == "true") {
-                            config.serverSettings[msg.guild.id].blockProfanity = true
-                            msg.channel.send(Embeds.prototype.success("Profanity filter enabled"))
+                            if (config.serverSettings[msg.guild.id].blockProfanity) {//stops if its already setup
+                                msg.channel.send(Embeds.prototype.error("This feature is already enabled"));
+                                return;
+                            }
+                            prompt(msg.author, msg.channel, "Webhooks are used to enforce the profanity filter, and one will be created for each channel.\nContinue?").then(r => {
+                                if (r) {
+                                    if (msg.guild.me.hasPermission('MANAGE_WEBHOOKS')) {
+                                        if (!config.serverSettings[msg.guild.id].webhooks) config.serverSettings[msg.guild.id].webhooks = []//start setup
+                                        let avatar = fs.readFileSync("./images/profanity.png")
+                                        msg.guild.channels.cache.filter(c => c.type == 'text').forEach(ch => {//only fetch text channels
+                                            client.channels.fetch(ch.id).then(channel => {//fetch and create webhook
+                                                channel.createWebhook("Profanity filter: #" + ch.name, { "avatar": "./images/profanity.png", "reason": "Filter enabled by " + msg.author.username }).then(webhook => {
+                                                    config.serverSettings[msg.guild.id].webhooks.push({ "channel": webhook.channelID, "id": webhook.id, "url": webhook.url })
+                                                    console.log(JSON.stringify(webhook))
+                                                }).catch((err) => {
+                                                    log('ERR', `Failed to create webhook: ${err.message}`)
+                                                    config.serverSettings[msg.guild.id].blockProfanity = false
+                                                    msg.channel.send(Embeds.prototype.error("Something went wrong during filter setup"))
+                                                    return;
+                                                })
+                                            })
+                                        })
+                                        config.serverSettings[msg.guild.id].blockProfanity = true//enable the filter
+                                        msg.channel.send(Embeds.prototype.success("Profanity filter enabled"))//let them know it finished afterwards
+                                    } else {
+                                        msg.channel.send(Embeds.prototype.error("I don't have permission to manage webhooks"))
+                                        return;
+                                    }
+                                } else {
+                                    msg.channel.send(Embeds.prototype.error("No changes were made"))
+                                    return;
+                                }
+                            })
                             return;
                         } else {
                             msg.channel.send(Embeds.prototype.default("This setting can only be 'true' or 'false'", "Invalid syntax"))
