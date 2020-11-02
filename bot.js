@@ -811,7 +811,7 @@ let backup = setInterval(() => {//saves the accounts to the file every 5 seconds
             Object.getOwnPropertyNames(svConf).forEach(c => {//for each setting from manifest
                 newConf[c] = svConf[c].default//copy data from the manifest over
             })
-            config.serverSettings[s] = newConf//save it
+            config.serverSettings[s.id] = newConf//save it
             return;
         }
         Object.getOwnPropertyNames(config.serverSettings[s.id]).forEach(ss => {//check existing settings for each server
