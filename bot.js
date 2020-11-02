@@ -449,37 +449,6 @@ client.on("message", (msg) => {
             msg.channel.send(Embeds.prototype.default("Guild | Rank | And the role it's linked to" + quoteBlock, "Linked roles"));
             break;
 
-        case "log":
-            if (args[0] == "clear" && msg.author.id == config.ownerID) { fs.writeFileSync(config.logPath, `\n[INFO](${Date.now()}) - The log was cleared`); msg.react(emojis.check); return; };
-            let lString;
-            let lLog = fs.readFileSync(config.logPath).toString().split("\n");
-            let maxLines = 80;//the absolute max lines can be printed. This will be reduced if the embed goes over the character limit
-            //embed descriptions must be 2048 or fewer characters
-            function generate() {
-                lString = "```md"//open code block
-                if (lLog.length > maxLines) {//trim
-                    lLog.splice(lLog.length - maxLines, lLog.length - maxLines)
-                };
-                for (let i = 0; i < lLog.length; i++) {//counts backwards from the length without exceeding the max
-                    if (lLog[i]) lString += "\n" + lLog[i];//skip if empty
-                };
-            };
-            generate();
-            while (lString.length >= 2045) {//changed from 2048 to 2045 to counter for the "```" after code blocks
-                //copy fewer lines until its small enough to fit in an embed
-                maxLines--;
-                generate();
-            };
-            lString += "```";//close the code block
-            let lEmbed = {//wrap the block in an embed
-                "embed": {
-                    "description": lString,
-                    "color": "#25A198"//different embed to match MD colors a bit
-                }
-            };
-            msg.channel.send(lEmbed);
-            break;
-
         case "guildrefresh":
             if (shutdownPending) { msg.channel.send(Embeds.prototype.busyRestarting()); return; }
             //only for the guild owner. This fetches ranks and updates the cached version
