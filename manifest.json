@@ -9,7 +9,8 @@
     ],
     "dependencies": [
         "discord.js",
-        "bad-words"
+        "bad-words",
+        "xhr2"
     ],
     "serverSettings": {
         "unregisteredRole": {

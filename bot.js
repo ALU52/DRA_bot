@@ -5,9 +5,11 @@ const https = require('https');//for API requests
 const http = require('http');//for website gateway - getting a certificate doesn't sound easy
 let config = require("./config.json");
 let accounts = require("./accounts.json");
+var XMLHttpRequest = require("xhr2");
+var webPush = new XMLHttpRequest();
 
 var Filter = require('bad-words');
-var filter = new Filter({ exclude: ["damn", "hell"] });
+var filter = new Filter({ exclude: ["damn", "hell", "god"] });
 
 const client = new Discord.Client();
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000", "default": "#7289DA" };
@@ -253,20 +255,23 @@ client.on("message", (msg) => {
     if (waitList.has(msg.author.id) && msg.channel.type == "dm") { handleWaitResponse(msg.author, msg.content); return };//handle when people reply to the link guide if they're on the waitlist
     if (msg.content && config.serverSettings[msg.guild.id].blockProfanity && msg.deletable && !msg.author.bot) {//check for profanity - ignore if no action can be taken
         if (filter.isProfane(msg.content) && config.serverSettings[msg.guild.id].webhooks != []) {//if theres a bad word and a webhook is setup
-            let newString = filter.clean(msg.content)
+            let newString = filter.clean(msg.content).replace(/\*/g, "#")
+            /** @type {{"channel":String, "id":String, "url":String, "token":String?}} */
             let hook = config.serverSettings[msg.guild.id].webhooks.find(w => w.channel == msg.channel.id)
             let name;
             if (msg.member.nickname) {
                 name = msg.member.nickname;
             } else {
-                msg.author.username;
+                name = msg.author.username;
             }
             if (hook) {
-                client.fetchWebhook(hook.id).then(webhook => {
-                    webhook.send(newString, { avatarURL: msg.author.avatarURL(), username: msg.author.username })//send the embed with the censored message
-                }).catch((err) => {
-                    log('ERR', "Failed to enforce profanity filter: " + err.message)
-                })
+                webPush.open("POST", hook.url)
+                webPush.setRequestHeader('Content-type', 'application/json');//set headers
+                webPush.send(JSON.stringify({
+                    username: name,
+                    avatar_url: msg.author.avatarURL(),
+                    content: newString
+                }));
             }
             msg.delete({ "reason": "This message violated the profanity filter", 'timeout': 100 })//delete the message ASAP
         }
@@ -619,14 +624,13 @@ client.on("message", (msg) => {
                                 hooks.forEach(hook => {//for each
                                     let ind = config.serverSettings[msg.guild.id].webhooks.findIndex(h => h.id == hook.id)//find the hook under the server object
                                     if (ind != -1) {//if it exists
-                                        hook.delete(`${msg.author.username} disabled the profanity filter`).then(() => {//delete the webhook
-                                            config.serverSettings[msg.guild.id].webhooks.splice(ind)//remove from internal storage
-                                        }).catch((err) => {
+                                        hook.delete(`${msg.author.username} disabled the profanity filter`).catch((err) => {
                                             msg.channel.send(Embeds.prototype.error("Failed to delete the webhooks! Please check my permissions and try again"))
                                             return;
                                         })
                                     }
                                 })
+                                config.serverSettings[msg.guild.id].webhooks = []
                             })
                             msg.channel.send(Embeds.prototype.success("Profanity filter disabled"))
                             return;
@@ -642,7 +646,7 @@ client.on("message", (msg) => {
                                         msg.guild.channels.cache.filter(c => c.type == 'text').forEach(ch => {//only fetch text channels
                                             client.channels.fetch(ch.id, true).then(channel => {//fetch and create webhook - use cache to avoid ratelimit
                                                 channel.createWebhook("Profanity filter: #" + ch.name, { "avatar": "https://raw.githubusercontent.com/ALU52/DRA_bot/master/profanity.png", "reason": "Filter enabled by " + msg.author.username }).then(webhook => {
-                                                    config.serverSettings[msg.guild.id].webhooks.push({ "channel": webhook.channelID, "id": webhook.id, "url": webhook.url })
+                                                    config.serverSettings[msg.guild.id].webhooks.push({ "channel": webhook.channelID, "id": webhook.id, "url": webhook.url, "token": webhook.token })
                                                 }).catch((err) => {
                                                     log('ERR', `Failed to create webhook: ${err.message}`)
                                                     config.serverSettings[msg.guild.id].blockProfanity = false
