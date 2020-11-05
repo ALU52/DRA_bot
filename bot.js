@@ -1126,6 +1126,8 @@ client.on('guildMemberAdd', (member) => {
             if (!r) { log('ERR', `Tried to give an unregistered role, but it seems like ${r.id} doesn't exist `); return; };
             if (!member.manageable) { log('ERR', `I don't have permissions to manage${member.id} in ${member.guild.id}`); return; };
             member.roles.add(r);//so help me god if this throws errors
+        }).catch((err) => {
+            log('ERR', `UnregisteredRole for ${member.guild.name} seems to be misconfigured!\n${err.name} : ${err.message}`)
         });
     };
 });
