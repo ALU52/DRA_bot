@@ -3,7 +3,8 @@
     "files": [
         "bot.js",
         "app.js",
-        "start.sh",
+        "sysRes.bat",
+        "start.bat",
         "README.md",
         "profanity.png"
     ],
