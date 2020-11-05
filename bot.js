@@ -9,7 +9,7 @@ var XMLHttpRequest = require("xhr2");
 var webPush = new XMLHttpRequest();
 
 var Filter = require('bad-words');
-var filter = new Filter({ exclude: ["damn", "hell", "god"] });
+var filter = new Filter({ exclude: ["damn", "hell", "god"] });//I allowed a few because we ain't children
 
 const client = new Discord.Client();
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000", "default": "#7289DA" };
@@ -23,13 +23,8 @@ let manifest
 config.lastBoot = Date.now();
 if (!config.ignoreList) config.ignoreList = [];
 
-/*
-There seems to be a memory leak somewhere in here - Ive narrowed it down to the queue
-Make custom objects for the queue, so unended things are filtered out
-*/
-
 //need to add support for guild owners of a guild already registered
-//only edit stuff
+//so it only edits/inserts stuff
 
 
 //#region Embeds
@@ -253,9 +248,10 @@ client.on("message", (msg) => {
         msg.channel.send(Embeds.prototype.default("👋 Hey there! My prefix is `" + config.prefix + "` Use `" + config.prefix + "help` to see a list of commands"));
     };
     if (waitList.has(msg.author.id) && msg.channel.type == "dm") { handleWaitResponse(msg.author, msg.content); return };//handle when people reply to the link guide if they're on the waitlist
-    if (msg.content && config.serverSettings[msg.guild.id].blockProfanity && msg.deletable && !msg.author.bot) {//check for profanity - ignore if no action can be taken
+    if (msg.content && config.serverSettings[msg.guild.id].blockProfanity && msg.deletable && !msg.author.bot && !msg.webhookID) {//check for profanity - ignore if no action can be taken
         if (filter.isProfane(msg.content) && config.serverSettings[msg.guild.id].webhooks != []) {//if theres a bad word and a webhook is setup
-            let newString = filter.clean(msg.content).replace(/\*/g, "#")
+            let fChar = ["#", "$", "!", "&", "%", "?"]
+            let newString = filter.clean(msg.content).replace(/\*/g, function () { return fChar[Math.floor(Math.random() * fChar.length)] })
             /** @type {{"channel":String, "id":String, "url":String, "token":String?}} */
             let hook = config.serverSettings[msg.guild.id].webhooks.find(w => w.channel == msg.channel.id)
             let name;
@@ -665,7 +661,7 @@ client.on("message", (msg) => {
 //maybe a set can solve the memory leak
 /**@type {Discord.GuildMember[]} */
 var roleQueue = [];
-var queueUsers = setInterval(() => {//adds every account to the update que - looks like its ignoring offline users, not sure how to fix this
+var queUpUsers = setInterval(() => {//adds every account to the update que - looks like its ignoring offline users, not sure how to fix this
     if (roleQueue.length >= 10) return;//ignore if theres already a lot in there
     client.guilds.cache.forEach(g => {//needs to fetch all members, not users
         g.members.fetch().then(members => {//try fetching first
@@ -682,7 +678,7 @@ var queueUsers = setInterval(() => {//adds every account to the update que - loo
 
 //this is to avoid making the APIs angry with me
 let queueDelay = 500
-var updateRoles = setInterval(() => {
+var queueTick = setInterval(() => {
     if (roleQueue.length >= 1) {//only run if theres someone there
         let member = roleQueue[roleQueue.length - 1];
         if (!config.serverSettings[member.guild.id] || config.ignoreList.includes(member.user.id)) {//ignore if there aren't any settings for this server or they chose to be ignored
@@ -759,7 +755,7 @@ var updateRoles = setInterval(() => {
     }
 }, queueDelay);
 //file backup
-let backup = setInterval(() => {//saves the accounts to the file every 5 seconds
+let backupTick = setInterval(() => {//saves the accounts to the file every 5 seconds
     manifest = require("./manifest.json")//time to load up the manifest again
     //verify config before saving it
     Object.getOwnPropertyNames(config).forEach(en => {//check data types
@@ -801,7 +797,7 @@ let backup = setInterval(() => {//saves the accounts to the file every 5 seconds
     });
 }, 5000);
 function stopBackup() {
-    clearInterval(backup)//stop the timer
+    clearInterval(backupTick)//stop the timer
     fs.writeFileSync(config.accountsPath, JSON.stringify(accounts));//save one final time
     fs.writeFileSync("./config.json", JSON.stringify(config));
 };
@@ -1127,9 +1123,9 @@ client.on('guildMemberAdd', (member) => {
     let serverSettings = config.serverSettings[member.guild.id];
     if (serverSettings.unregisteredRole != null) {//unregistered role is enabled, fetch it
         member.guild.roles.fetch(serverSettings.unregisteredRole).then(r => {//I keep forgetting that roles.fetch() is async
-            if (!role) { log('ERR', `Tried to give an unregistered role, but it seems like ${role.id} doesn't exist `); return; };
+            if (!r) { log('ERR', `Tried to give an unregistered role, but it seems like ${r.id} doesn't exist `); return; };
             if (!member.manageable) { log('ERR', `I don't have permissions to manage${member.id} in ${member.guild.id}`); return; };
-            member.roles.add(role);//so help me god if this throws errors
+            member.roles.add(r);//so help me god if this throws errors
         });
     };
 });
@@ -1157,7 +1153,7 @@ process.on('message', (m) => {//manages communication with parent
         case "shutdown":
             log('INFO', "Cleaning up...");
             shutdownPending = true;//tells the rest of the bot not to start any new operations
-            clearInterval(queueUsers);//stop adding users to the queue
+            clearInterval(queUpUsers);//stop adding users to the queue - try to let the queue finish before stopping
             clearInterval(scrollInterval);//stop updating presence and change to restart message
             if (client.user) client.user.setPresence({ status: "dnd", activity: { name: "with system files", type: "PLAYING" }, });
             server.removeAllListeners();//stop listening for API events
