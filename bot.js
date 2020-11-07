@@ -4,6 +4,7 @@ const os = require('os');
 const https = require('https');//for API requests
 const http = require('http');//for website gateway - getting a certificate doesn't sound easy
 let config = require("./config.json");
+/**@type {Account[]} */
 let accounts = require("./accounts.json");
 var XMLHttpRequest = require("xhr2");
 var webPush = new XMLHttpRequest();
@@ -11,23 +12,24 @@ var webPush = new XMLHttpRequest();
 var Filter = require('bad-words');
 var filter = new Filter({ exclude: ["damn", "hell", "god"] });//I allowed a few because we ain't children
 
-const client = new Discord.Client();
+const client = new Discord.Client();//The bot client... duhhh
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000", "default": "#7289DA" };
-const emojis = { "check": "✅", "cross": "❌", "warning": "⚠️", "question": "❓" }
+const emojis = { "check": "✅", "cross": "❌", "warning": "⚠️", "question": "❓" };
 var rateLimitMode = false;//stops the bot for a while on rate limit
 var waitList = new Set();//list of people who need to give an API key to link
 var waitCD = new Set();//a list of people who've recently responded to a linkGuide, enforces limit so gw API doesn't get spammed by jerks
 var shutdownPending = false;//prevents new operation from being started when the bot is trying to restart
-let manifest
+let manifest;//used for checking config integrity and restoring default values if needed
 
 config.lastBoot = Date.now();
-if (!config.ignoreList) config.ignoreList = [];
+if (!config.ignoreList) config.ignoreList = [];//not sure if its safe to remove this yet
 
 //need to add support for guild owners of a guild already registered
 //so it only edits/inserts stuff
 
+//Im going nuts with the classes because I'm trying to standardize the way data is handled. Its a fcking mess rn
 
-//#region Embeds
+//#region Classes
 class Embeds {
     /**
      * 
@@ -42,16 +44,16 @@ class Embeds {
                     "description": string,
                     "color": colors.default,
                 }
-            }
+            };
         } else {
             return {
                 "embed": {
                     "description": string,
                     "color": colors.default,
                 }
-            }
-        }
-    }
+            };
+        };
+    };
     /**
      * 
      * @param {Discord.User} warnedUser The user that's being warned
@@ -68,8 +70,11 @@ class Embeds {
                     "icon_url": warnedUser.avatarURL()
                 }
             }
-        }
-    }
+        };
+    };
+    /**
+     * Lets the user know why their command will be ignored
+     */
     busyRestarting() {
         return {
             "embed": {
@@ -79,6 +84,9 @@ class Embeds {
             }
         }
     }
+    /**
+     * Tells the user to f*ck off
+     */
     slowDown() {
         return {
             "embed": {
@@ -195,6 +203,9 @@ class Embeds {
             }
         }
     }
+    /**
+     * This should be pretty obvious
+     */
     settings() {
         return {
             "embed": {
@@ -209,6 +220,9 @@ class Embeds {
             }
         }
     }
+    /**
+     * My god why am I even writing these
+     */
     linkGuide() {
         return {//sent to users who use the "link" command
             "embed": {
@@ -217,22 +231,122 @@ class Embeds {
                 "color": colors.default
             }
         };
-    }
+    };
+    /**
+     * This one is obvious too
+     * @param {String} string The message for the user
+     */
     success(string) {//wraps strings in a success embed message
         return {
             "embed": {
                 "description": `${emojis.check} ${string}`,
                 "color": colors.success
             }
-        }
-    }
+        };
+    };
+    /**
+     * For when the user tries commands they don't have perms for like an idiot
+     */
+    noPerms() {
+        return {
+            "embed": {
+                "description": `${emojis.cross} You don't have permission to do that`,
+                "color": colors.error
+            }
+        };
+    };
+    /**
+     * The word that makes me cringe
+     * @param {string} string The error message to send
+     */
     error(string) {//warps strings in an error embed message
         return {
             "embed": {
                 "description": `${emojis.cross} ${string}`,
                 "color": colors.error
             }
-        }
+        };
+    };
+};
+class ServerSettings {
+    constructor() {
+        this.blockProfanity = false
+        /**@type {Webhook[]} Webhooks used to enforce the profanity filter*/
+        this.webhooks = []
+        /**@type {string} The role ID to assign to unlinked accounts*/
+        this.unregisteredRole = ""
+        /**@type {Link[]} Used to link guild ranks to Discord roles*/
+        this.links = []
+    }
+}
+class Webhook {
+    /**
+     * Used to find the appropriate url while enforcing the profanity filter
+     * @param {string} channel The Discord channel ID
+     * @param {string} url The webhook URL to post to
+     */
+    constructor(channel, url) {
+        this.channel = channel
+        this.url = url
+    }
+}
+class Link {
+    /**
+     * Used to link Discord roles to guild Ranks
+     * @param {number} rank The corresponding position as a number e.g. "0" = Everyone, "1" = Leader, "2" = Officer, and so on
+     * @param {string} role The Discord role ID to give 
+     * @param {string} guild The guild ID to check for
+     */
+    constructor(rank, role, guild) {
+        this.rank = rank
+        this.role = role
+        this.guilds = guild
+    }
+}
+class Account {
+    /**
+     * Used for linking and tracking of users
+     * @param {string} id The Discord ID
+     * @param {string} key The Gw2 API key
+     * @param {string} gwId The Gw2 account ID
+     * @param {string[]} guilds An array of guild IDs the user is in
+     */
+    constructor(id, key, gwId, guilds) {
+        this.id = id;
+        this.key = key;
+        this.time = Date.now()
+        this.guilds = guilds
+        this.gwId = gwId
+    }
+}
+class Guild {
+    /**
+     * Used to cache guilds from Gw2
+     * @param {string} name The name of the guild - Never use this to identify guilds, it may change.
+     * @param {string} leader The Discord ID of the owner
+     * @param {string} id The guild ID - What should be used to identify them
+     * @param {string} tag The guild tag e.g. [YOLO]
+     */
+    constructor(name, id, tag, leader) {
+        /**@type {Rank[]} */
+        this.ranks = [];
+        this.name = name
+        this.id = id
+        this.tag = tag
+        /**@type {string[]} */
+        this.aliases = []
+        this.leader = leader
+    }
+};
+class Rank {
+    /**
+     * Guild Rank. For use in Guild.ranks[] only
+     * @param {string} id The guild rank name e.g. "Officer" or "Member"
+     * @param {number} order The corresponding position as a number e.g. "0" = Everyone, "1" = Leader, "2" = Officer, and so on
+     */
+    constructor(id, order) {
+        this.id = id;
+        this.order = order;
     }
 }
 //#endregion
@@ -248,30 +362,32 @@ client.on("message", (msg) => {
         msg.channel.send(Embeds.prototype.default("👋 Hey there! My prefix is `" + config.prefix + "` Use `" + config.prefix + "help` to see a list of commands"));
     };
     if (waitList.has(msg.author.id) && msg.channel.type == "dm") { handleWaitResponse(msg.author, msg.content); return };//handle when people reply to the link guide if they're on the waitlist
-    if (msg.content && config.serverSettings[msg.guild.id].blockProfanity && msg.deletable && !msg.author.bot && !msg.webhookID) {//check for profanity - ignore if no action can be taken
-        if (filter.isProfane(msg.content) && config.serverSettings[msg.guild.id].webhooks != []) {//if theres a bad word and a webhook is setup
-            let fChar = ["#", "$", "!", "&", "%", "?"]
-            let newString = filter.clean(msg.content).replace(/\*/g, function () { return fChar[Math.floor(Math.random() * fChar.length)] })
-            /** @type {{"channel":String, "id":String, "url":String, "token":String?}} */
-            let hook = config.serverSettings[msg.guild.id].webhooks.find(w => w.channel == msg.channel.id)
-            let name;
-            if (msg.member.nickname) {
-                name = msg.member.nickname;
-            } else {
-                name = msg.author.username;
-            }
-            if (hook) {
-                webPush.open("POST", hook.url)
-                webPush.setRequestHeader('Content-type', 'application/json');//set headers
-                webPush.send(JSON.stringify({
-                    username: name,
-                    avatar_url: msg.author.avatarURL(),
-                    content: newString
-                }));
-            }
-            msg.delete({ "reason": "This message violated the profanity filter", 'timeout': 100 })//delete the message ASAP
-        }
-    }
+    if (msg.channel.type != "dm") {
+        if (msg.content && fetchSettings(msg.guild.id).blockProfanity && msg.deletable && !msg.author.bot && !msg.webhookID) {//check for profanity - ignore if no action can be taken
+            if (filter.isProfane(msg.content) && fetchSettings(msg.guild.id).webhooks != []) {//if theres a bad word and a webhook is setup
+                let fChar = ["#", "$", "!", "&", "%", "?"]
+                let newString = filter.clean(msg.content).replace(/\*/g, function () { return fChar[Math.floor(Math.random() * fChar.length)] })
+                /** @type {{"channel":String, "id":String, "url":String, "token":String?}} */
+                let hook = fetchSettings(msg.guild.id).webhooks.find(w => w.channel == msg.channel.id)
+                let name;
+                if (msg.member.nickname) {
+                    name = msg.member.nickname;
+                } else {
+                    name = msg.author.username;
+                }
+                if (hook) {
+                    webPush.open("POST", hook.url)
+                    webPush.setRequestHeader('Content-type', 'application/json');//set headers
+                    webPush.send(JSON.stringify({
+                        username: name,
+                        avatar_url: msg.author.avatarURL(),
+                        content: newString
+                    }));
+                };
+                msg.delete({ "reason": "This message violated the profanity filter", 'timeout': 100 })//delete the message ASAP
+            };
+        };
+    };
     if (msg.author.bot || !msg.content.startsWith(config.prefix) || config.blacklist.includes(msg.author.id) || msg.system || msg.webhookID) return;//ignores bots, DMs, people on blacklist, and anything not starting with the prefix
     let messageArray = msg.content.split(" ");
     let command = messageArray[0].substring(config.prefix.length).toLowerCase();
@@ -287,7 +403,7 @@ client.on("message", (msg) => {
             break;
 
         case "ping":
-            msg.channel.send(Embeds.prototype.default(`Response time: ${client.ws.ping} ms`, "Pong!"))
+            msg.channel.send(Embeds.prototype.default(`Response time: ${client.ws.ping} ms`, "Pong!"));
             break;
 
         case "info":
@@ -333,7 +449,7 @@ client.on("message", (msg) => {
             if (msg.channel.type == "dm") { msg.channel.send(Embeds.prototype.error("This command can only be used in servers")); return; };
             if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.channel.send(Embeds.prototype.error("Sorry, only the server staff can use this")); return; };
             if (args.length != 3) {//show help message if args are wrong
-                msg.channel.send(Embeds.prototype.default("This command links a role to a guild to be assigned automatically\n**Usage:** roleAdd <roleID> <rank> <guildTag>\nThe rank should be a number 1-9. The rank number depends on the order in the guild. 0 will be given to every member of the guild. Otherwise, they increase with the highest rank (e.g. the leader) being #1. With the exception of #0, the highest rank = the lowest #, with the lowest rank = the highest #"));
+                msg.channel.send(Embeds.prototype.default(`This command links a role to a guild to be assigned automatically\n**Usage:** roleAdd <roleID> <rank> <guild>\nUse '${config.prefix}guild' to see available ranks`));
                 return;
             } else {
                 //should search for the guild tag first
@@ -346,11 +462,11 @@ client.on("message", (msg) => {
                 prompt(msg.author, msg.channel, `This will link <@&${role.id}> to ${guild.name}\nContinue?`).then(r => {
                     if (r) {
                         //add the role link to the server under the guild
-                        let newRole = { "rank": rank, "role": role.id, "guild": guild.id };
-                        if (!config.serverSettings[msg.guild.id].links) {//if its null and needs to be set up
-                            config.serverSettings[msg.guild.id].links = [newRole]
+                        let newRole = new Link(rank, role.id, guild.id);
+                        if (!fetchSettings(msg.guild.id).links) {//if its null and needs to be set up
+                            fetchSettings(msg.guild.id).links = [newRole]
                         } else {//already setup, push to it
-                            config.serverSettings[msg.guild.id].links.push(newRole)
+                            fetchSettings(msg.guild.id).links.push(newRole)
                         }
                         /////////////////////////////////////////////////
                         msg.channel.send(Embeds.prototype.success(`Link successful`));
@@ -401,14 +517,14 @@ client.on("message", (msg) => {
                 let role = msg.guild.roles.cache.find(r => r.id == args[0]);
                 if (!role) { msg.channel.send(Embeds.prototype.error("This role doesn't exist")); return; };
                 try {
-                    let remRole = config.serverSettings[msg.guild.id].links.find(r => r.role == args[0])
+                    let remRole = fetchSettings(msg.guild.id).links.find(r => r.role == args[0])
                     if (!remRole) {
                         msg.channel.send(Embeds.prototype.error("This role isn't linked to any guilds"))
                         return;
                     } else {
-                        let remIndex = config.serverSettings[msg.guild.id].links.findIndex(r => role == args[0])
+                        let remIndex = fetchSettings(msg.guild.id).links.findIndex(r => role == args[0])
                         msg.channel.send(Embeds.prototype.success(`<@&${remRole.role}> was unlinked`))
-                        config.serverSettings[msg.guild.id].links.splice(remIndex)
+                        fetchSettings(msg.guild.id).links.splice(remIndex)
                         return;
                     }
                 } catch (error) {
@@ -419,13 +535,10 @@ client.on("message", (msg) => {
             break;
 
         case "roles":
-            if (msg.channel.type == "dm") { msg.channel.send(Embeds.prototype.error(`This is a server only command`)); return; };
+            if (msg.channel.type == "dm") { msg.channel.send(Embeds.prototype.error("This command can only be used in servers")); return; };
             let collected = [];
             //create a list of configured roles for this server
-            if (!config.serverSettings[msg.guild.id]) {
-                msg.channel.send(Embeds.prototype.error("This server isn't registered yet! This usually means there was an error behind the scenes.\nPlease try again later"));
-            };
-            let links = config.serverSettings[msg.guild.id].links;
+            let links = fetchSettings(msg.guild.id).links;
             if (links) {
                 links.forEach(l => {
                     let guild = config.guilds.find(g => g.id == l.guild);
@@ -458,13 +571,27 @@ client.on("message", (msg) => {
 
         case "guild":
             //returns a raw guild so all the data can be seen
-            let g = JSON.stringify(searchGuilds(args[0]));
-            msg.channel.send("```json\n" + g + "```");
+            let gcGuild = searchGuilds(args[0]);
+            if (gcGuild) {
+                let rankBlock = "```\n0 : [Everyone]"//open the block
+                if (gcGuild.ranks.length >= 1) {//ranks there
+                    gcGuild.ranks.forEach(r => {
+                        rankBlock += `\n${r.order} : ${r.id}`
+                    })
+                    rankBlock += "```"//close the block
+                } else {//no ranks
+                    rankBlock += "\n```\nThe guild owner needs to link their account for other ranks to work";
+                }
+                msg.channel.send(Embeds.prototype.default(`**${gcGuild.name} [${gcGuild.tag}]**\nID: ${gcGuild.id}\nRanks:\n${rankBlock}`))//god, please forgive me for this line
+            } else {
+                msg.channel.send(Embeds.prototype.error("I'm not sure which guild you're referring to"))
+            }
             break;
 
         case "server":
-            if (msg.channel.type == "dm") { msg.channel.send(Embeds.prototype.error(`This is a server only command`)); return; };
-            let s = JSON.stringify(config.serverSettings[msg.guild.id]);
+            //depreciated command
+            if (msg.channel.type == "dm") { msg.channel.send(Embeds.prototype.error("This command can only be used in servers")); return; };
+            let s = JSON.stringify(fetchSettings(msg.guild.id), null, 1);//try to format while keeping it compact for embed
             msg.channel.send("```json\n" + s + "```");
             break;
 
@@ -483,40 +610,9 @@ client.on("message", (msg) => {
             };
             break;
 
-        case "reset":
-            //only for recovering from broken updates
-            if (msg.author.id == config.ownerID) {
-                if (args[0]) {
-                    if (args[0].toLowerCase() == "accounts") {
-                        prompt(msg.author, msg.channel, "This will unlink all accounts!\nContinue?").then(r => {
-                            if (r) {
-                                accounts = [];
-                                msg.channel.send(Embeds.prototype.success("Data reset"))
-                            } else {
-                                msg.channel.send(Embeds.prototype.error("No changes were made"))
-                            }
-                        })
-                    }
-                } else {
-                    prompt(msg.author, msg.channel, "This will reset all guild and server data!\nContinue?").then(r => {
-                        if (r) {
-                            config.guilds = manifest.config.guilds.default
-                            config.serverSettings = manifest.config.serverSettings.default
-                            msg.channel.send(Embeds.prototype.success("Data reset"))
-                        } else {
-                            msg.channel.send(Embeds.prototype.error("No changes were made"))
-                        }
-                    })
-                }
-            };
-            break;
-
         case "set":
-            //under construction
-            //this command is for other server-specific settings, as stored in config
-            //the webpage and web-to-bot API will be a workaround for this - to make up for its user unfriendliness
-            //will allow an "unregistered" role to be automatically given to anybody who hasn't linked their account, among other things
-
+            //allows the server owner to change server specific settings
+            if (msg.channel.type == "dm") { msg.channel.send(Embeds.prototype.error("This command can only be used in servers")); return; };
             if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.channel.send(Embeds.prototype.error("Sorry, only the server staff can use this")); return; };
             if (!args[0]) {//no args - show help page
                 msg.channel.send(Embeds.prototype.settings())
@@ -525,14 +621,14 @@ client.on("message", (msg) => {
             switch (args[0].toLowerCase()) {
                 case "unregisteredrole":
                     if (!args[1]) {//missing argument - show current setting
-                        if (!config.serverSettings[msg.guild.id].muteRole) {
+                        if (!fetchSettings(msg.guild.id).muteRole) {
                             msg.channel.send(Embeds.prototype.default("This setting is empty"))
                         } else {
-                            msg.channel.send(Embeds.prototype.default(`<@&${config.serverSettings[msg.guild.id].muteRole}> (${config.serverSettings[msg.guild.id].muteRole})`, "Current setting"))
+                            msg.channel.send(Embeds.prototype.default(`<@&${fetchSettings(msg.guild.id).unregisteredRole}> (${fetchSettings(msg.guild.id).unregisteredRole})`, "Current setting"))
                         }
                     } else {//args good
                         if (args[1] == "clear" || args[1] == "null" || args[1] == "reset") {//reset
-                            config.serverSettings[msg.guild.id].unregisteredRole = ""
+                            fetchSettings(msg.guild.id).unregisteredRole = ""
                             msg.channel.send(Embeds.prototype.success("Setting reset"))
                             return;
                         };
@@ -540,33 +636,7 @@ client.on("message", (msg) => {
                         if (!role) { msg.channel.send(Embeds.prototype.error("That tole doesn't exist")); return; };
                         prompt(msg.author, msg.channel, `This will give <@&${role.id}> to all unlinked accounts.\nProceed?`).then(r => {
                             if (r) {
-                                config.serverSettings[msg.guild.id].unregisteredRole = role.id
-                                msg.channel.send(Embeds.prototype.success("Role linked\nSet to 'null' to undo these changes"));
-                            } else {
-                                msg.channel.send(Embeds.prototype.error("No changes were made"));
-                            }
-                        })
-                    };
-                    break;
-
-                case "muterole":
-                    if (!args[1]) {//missing argument - show current setting
-                        if (!config.serverSettings[msg.guild.id].muteRole) {
-                            msg.channel.send(Embeds.prototype.default("This setting is empty"))
-                        } else {
-                            msg.channel.send(Embeds.prototype.default(`<@&${config.serverSettings[msg.guild.id].muteRole}> (${config.serverSettings[msg.guild.id].muteRole})`, "Current setting"))
-                        }
-                    } else {//args good
-                        if (args[1] == "clear" || args[1] == "null" || args[1] == "reset") {//reset
-                            config.serverSettings[msg.guild.id].muteRole = ""
-                            msg.channel.send(Embeds.prototype.success("Setting reset"))
-                            return;
-                        };
-                        let role = msg.guild.roles.cache.find(r => r.id == args[1])
-                        if (!role) { msg.channel.send(Embeds.prototype.error("That tole doesn't exist")); return; };
-                        prompt(msg.author, msg.channel, `This will set <@&${role.id}> as the role to mute with.\nProceed?`).then(r => {
-                            if (r) {
-                                config.serverSettings[msg.guild.id].muteRole = role.id
+                                fetchSettings(msg.guild.id).unregisteredRole = role.id
                                 msg.channel.send(Embeds.prototype.success("Role linked\nSet to 'null' to undo these changes"));
                             } else {
                                 msg.channel.send(Embeds.prototype.error("No changes were made"));
@@ -577,17 +647,17 @@ client.on("message", (msg) => {
 
                 case "blockprofanity":
                     if (!args[1]) {//show current setting
-                        msg.channel.send(Embeds.prototype.default(`\`\`\`${config.serverSettings[msg.guild.id].blockProfanity}\`\`\``, "Current setting"))
+                        msg.channel.send(Embeds.prototype.default(`\`\`\`${fetchSettings(msg.guild.id).blockProfanity}\`\`\``, "Current setting"))
                     } else {
                         if (args[1] == "off" || args[1] == "false" || args[1] == "reset") {//reset 
-                            if (!config.serverSettings[msg.guild.id].blockProfanity) {//stops if its already setup
+                            if (!fetchSettings(msg.guild.id).blockProfanity) {//stops if its already setup
                                 msg.channel.send(Embeds.prototype.error("This feature is already disabled"));
                                 return;
                             }
-                            config.serverSettings[msg.guild.id].blockProfanity = false
+                            fetchSettings(msg.guild.id).blockProfanity = false
                             msg.guild.fetchWebhooks().then(hooks => {//fetch all hooks
                                 hooks.forEach(hook => {//for each
-                                    let ind = config.serverSettings[msg.guild.id].webhooks.findIndex(h => h.id == hook.id)//find the hook under the server object
+                                    let ind = fetchSettings(msg.guild.id).webhooks.findIndex(h => h.url == hook.url)//find the hook under the server object
                                     if (ind != -1) {//if it exists
                                         hook.delete(`${msg.author.username} disabled the profanity filter`).catch((err) => {
                                             msg.channel.send(Embeds.prototype.error("Failed to delete the webhooks! Please check my permissions and try again"))
@@ -595,32 +665,32 @@ client.on("message", (msg) => {
                                         })
                                     }
                                 })
-                                config.serverSettings[msg.guild.id].webhooks = []
+                                fetchSettings(msg.guild.id).webhooks = []
                             })
                             msg.channel.send(Embeds.prototype.success("Profanity filter disabled"))
                             return;
                         } else if (args[1] == "on" || args[1] == "true") {
-                            if (config.serverSettings[msg.guild.id].blockProfanity) {//stops if its already setup
+                            if (fetchSettings(msg.guild.id).blockProfanity) {//stops if its already setup
                                 msg.channel.send(Embeds.prototype.error("This feature is already enabled"));
                                 return;
                             }
                             prompt(msg.author, msg.channel, "Webhooks are used to enforce the profanity filter, and one will be created for each channel.\nContinue?").then(r => {
                                 if (r) {
                                     if (msg.guild.me.hasPermission('MANAGE_WEBHOOKS')) {
-                                        if (!config.serverSettings[msg.guild.id].webhooks) config.serverSettings[msg.guild.id].webhooks = []//start setup
-                                        msg.guild.channels.cache.filter(c => c.type == 'text').forEach(ch => {//only fetch text channels
+                                        if (!fetchSettings(msg.guild.id).webhooks) fetchSettings(msg.guild.id).webhooks = []//start setup
+                                        msg.guild.channels.cache.filter(c => c.type == 'text').forEach(ch => {//this may be causing ratelimit issues
                                             client.channels.fetch(ch.id, true).then(channel => {//fetch and create webhook - use cache to avoid ratelimit
                                                 channel.createWebhook("Profanity filter: #" + ch.name, { "avatar": "https://raw.githubusercontent.com/ALU52/DRA_bot/master/profanity.png", "reason": "Filter enabled by " + msg.author.username }).then(webhook => {
-                                                    config.serverSettings[msg.guild.id].webhooks.push({ "channel": webhook.channelID, "id": webhook.id, "url": webhook.url, "token": webhook.token })
+                                                    fetchSettings(msg.guild.id).webhooks.push(new Webhook(webhook.channelID, webhook.url))//save it to memory for later use
                                                 }).catch((err) => {
                                                     log('ERR', `Failed to create webhook: ${err.message}`)
-                                                    config.serverSettings[msg.guild.id].blockProfanity = false
+                                                    fetchSettings(msg.guild.id).blockProfanity = false
                                                     msg.channel.send(Embeds.prototype.error("Something went wrong during filter setup"))
                                                     return;
                                                 })
                                             })
                                         })
-                                        config.serverSettings[msg.guild.id].blockProfanity = true//enable the filter
+                                        fetchSettings(msg.guild.id).blockProfanity = true//enable the filter
                                         msg.channel.send(Embeds.prototype.success("Profanity filter enabled"))//let them know it finished afterwards
                                     } else {
                                         msg.channel.send(Embeds.prototype.error("I don't have permission to manage webhooks"))
@@ -643,7 +713,6 @@ client.on("message", (msg) => {
                     msg.channel.send(Embeds.prototype.error("Unknown setting"))
                     break;
             }
-
             break;
 
         default:
@@ -681,15 +750,15 @@ let queueDelay = 500
 var queueTick = setInterval(() => {
     if (roleQueue.length >= 1) {//only run if theres someone there
         let member = roleQueue[roleQueue.length - 1];
-        if (!config.serverSettings[member.guild.id] || config.ignoreList.includes(member.user.id)) {//ignore if there aren't any settings for this server or they chose to be ignored
+        if (!fetchSettings(member.guild.id) || config.ignoreList.includes(member.user.id)) {//ignore if there aren't any settings for this server or they chose to be ignored
             roleQueue.pop();
             return;
         }
         let account = accounts.find(a => a.id == member.user.id);
         if (account) {//first check if they're registered
-            if (config.serverSettings[member.guild.id].unregisteredRole != null) {//if the role is configured
-                if (member.roles.cache.has(config.serverSettings[member.guild.id].unregisteredRole)) {//if they have the role
-                    member.roles.remove(config.serverSettings[member.guild.id].unregisteredRole).catch(e => {//remove it
+            if (fetchSettings(member.guild.id).unregisteredRole != null) {//if the role is configured
+                if (member.roles.cache.has(fetchSettings(member.guild.id).unregisteredRole)) {//if they have the role
+                    member.roles.remove(fetchSettings(member.guild.id).unregisteredRole).catch(e => {//remove it
                         log('ERR', `Failed to manage ${member.id}'s roles: ${e}`);
                         roleQueue.pop();
                         return;
@@ -726,9 +795,9 @@ var queueTick = setInterval(() => {
                     roleQueue.pop();
                     return;
                 };
-            } else {//nah, the cache is still valid
-                if (!config.serverSettings[member.guild.id].links || config.serverSettings[member.guild.id].links == []) { roleQueue.pop(); return; }
-                config.serverSettings[member.guild.id].links.forEach(l => {
+            } else {//nah, the cache is still valid - now apply roles
+                if (!fetchSettings(member.guild.id).links || fetchSettings(member.guild.id).links == []) { roleQueue.pop(); return; }
+                fetchSettings(member.guild.id).links.forEach(l => {
                     if (!l || typeof l.role != 'string') return;
                     if (account.guilds.includes(l.guild) && !member.roles.cache.has(l.role)) {
                         //this part cant be finished until I find a way to check everyones rank inside a guild
@@ -741,9 +810,9 @@ var queueTick = setInterval(() => {
                 return;
             };
         } else {//unregistered account
-            if (config.serverSettings[member.guild.id].unregisteredRole != null) {
-                if (member.roles.cache.has(config.serverSettings[member.guild.id].unregisteredRole)) { roleQueue.pop(); return; };//ignore if they already have it
-                member.roles.add(config.serverSettings[member.guild.id].unregisteredRole).catch(e => {
+            if (fetchSettings(member.guild.id).unregisteredRole != null) {
+                if (member.roles.cache.has(fetchSettings(member.guild.id).unregisteredRole)) { roleQueue.pop(); return; };//ignore if they already have it
+                member.roles.add(fetchSettings(member.guild.id).unregisteredRole).catch(e => {
                     log('ERR', `Failed to manage ${member.id}'s roles: ${e}`);
                 });
             }
@@ -771,27 +840,27 @@ let backupTick = setInterval(() => {//saves the accounts to the file every 5 sec
         }
     })
     //now save it
-    fs.writeFileSync(config.accountsPath, JSON.stringify(accounts));
-    fs.writeFileSync("./config.json", JSON.stringify(config));
+    fs.writeFileSync(config.accountsPath, JSON.stringify(accounts, null, 4));
+    fs.writeFileSync("./config.json", JSON.stringify(config, null, 4));
     let svConf = manifest.serverSettings//load up server specific settings
     client.guilds.cache.forEach(s => {//for each server
-        if (!config.serverSettings[s.id]) {//if settings are missing
+        if (!fetchSettings(s.id)) {//if settings are missing
             let newConf = {}//create new settings object
             Object.getOwnPropertyNames(svConf).forEach(c => {//for each setting from manifest
                 newConf[c] = svConf[c].default//copy data from the manifest over
             })
-            config.serverSettings[s.id] = newConf//save it
+            fetchSettings(s.id) = newConf//save it
             return;
         }
-        Object.getOwnPropertyNames(config.serverSettings[s.id]).forEach(ss => {//check existing settings for each server
-            if (typeof config.serverSettings[s.id][ss] != svConf[ss].type) {//if its the wrong data type
+        Object.getOwnPropertyNames(fetchSettings(s.id)).forEach(ss => {//check existing settings for each server
+            if (typeof fetchSettings(s.id)[ss] != svConf[ss].type) {//if its the wrong data type
                 log('WARN', `Wrong data type found for ${s.id}/${ss}`)
-                config.serverSettings[s.id][ss] = svConf[ss].default
+                fetchSettings(s.id)[ss] = svConf[ss].default
             }
         })
         Object.getOwnPropertyNames(svConf).forEach(ss => {//check if any new settings need to be added
-            if (!config.serverSettings[s.id][ss]) {//if its missing
-                config.serverSettings[s.id][ss] = svConf[ss].default
+            if (!fetchSettings(s.id)[ss]) {//if its missing
+                fetchSettings(s.id)[ss] = svConf[ss].default
             }
         })
     });
@@ -841,7 +910,7 @@ function handleWaitResponse(user, content) {
         }
         if (!r.permissions.includes('guilds')) { user.send("This key is missing guild permissions. Please fix this and again."); return; };
         apiFetch('account', key).then(r => {//request for user guilds
-            accounts.push({ "id": user.id, "gwid": r.id, "name": r.name, "guilds": r.guilds, "time": Date.now(), "oauth": {}, "key": content });//add them to the account file
+            accounts.push(new Account(user.id, content, r.id, r.guilds));//add them to the account file
             waitList.delete(user.id);//remove them from the waitlist
             r.guilds.forEach(g => {//callback for each guild the user is in
                 if (config.guilds.find(i => i.id == g)) return//ignores guilds it already knows about
@@ -853,17 +922,23 @@ function handleWaitResponse(user, content) {
             log('INFO', `New link: ${user.id}`)
             user.send(Embeds.prototype.success(`Successfully linked <@${user.id}> to ${r.name}`));
             //linked, now search for all the guilds they're in and immediately add them to the queue
-        });
-    }).catch((err) => {
-        log("ERR", `Failed guild setup: ${err}`)
+        }).catch(err => {
+            hwrHandle(err);
+        })
+    }).catch(err => {
+        hwrHandle(err);
+    });
+    function hwrHandle(err) {
+        if (err.name) log("ERR", `Failed guild setup: ${err.name}`);
         user.send(Embeds.prototype.error(`There was an error during setup. Did you provide a valid API key? Please DM <@" + ${config.ownerID} + "> if you'd like help`));
-        return;
-    })
-}
+    };
+};
 
 /**
- * Searches through the guilds and returns the closest thing found
+ * Searches the known guilds by name, aliases, and tags. Returns the first match.
+ * Aliases are depreciated
  * @param {string} query The name or tag
+ * @returns {Guild|null}
  */
 function searchGuilds(query) {
     let string = normalizeString(query);
@@ -897,7 +972,7 @@ function searchGuilds(query) {
 }
 
 /**
- * Saves a new guild
+ * Adds a new guild to the cache
  * @param {string} id The guild ID to add
  * @param {string} key The API key to use
  * @param {boolean} owner Whether the user adding the guild is the owner. False by default
@@ -905,30 +980,26 @@ function searchGuilds(query) {
 function newGuild(id, key, owner) {
     //new function must be added that also reads the guild ranks if its the guild owner
     if (!config.guilds.find(g => g.id == id)) {//ignores if its already there
-        let leader;
-        let newGuild = { "aliases": [], "ranks": [{ "id": "Everyone", "order": 0 }], "leader": null };
-        if (!owner) leader = false; else leader = owner;//makes "owner" default to false
         apiFetch('guild/' + id, key).then(res => {//request more info about the guild, and register it
-            newGuild.id = res.id;
-            newGuild.name = res.name;
-            newGuild.tag = res.tag;
+            let newGuild = new Guild(res.name, res.id, res.tag)
             log('INFO', `New guild registered: ` + res.name);
-            if (leader) {
-                let l = accounts.find(a => a.key == key)//finds the linked account via key
-                if (l) newGuild.leader = l.id;
+            if (owner) {
+                let l = accounts.find(a => a.key == key);//finds the linked account via key
+                if (l) newGuild.leader = l.id;//saves the owner's discord ID
                 log('INFO', `Leader detected, adding ranks`);
                 apiFetch(`guild/${id}/ranks`, key).then(res => {
-                    if (!Array.isArray(res)) { log('ERR', `Got an unusual response from API while fetching ranks: ${res}`) }
+                    if (!Array.isArray(res)) { log('ERR', `Got an unusual response from API while fetching ranks: ${res}`); return; };
                     res.forEach(r => {//append each rank to the guild object
                         newGuild.ranks.push({ "id": r.id, "order": r.order });
-                    })
+                    });
+                }).then(() => {//push when its done
+                    config.guilds.push(newGuild);
                 }).catch(e => {
                     log('ERR', `Error while fetching ranks for ${id} : ${e}`);
-                })
-            }
-            setTimeout(() => {//wait for ranks to fetch - ik theres better ways to do this
+                });
+            } else {//push it right away because its not waiting for ranks
                 config.guilds.push(newGuild);
-            }, 1000);
+            };
         }).catch(e => {
             log('ERR', `Error while fetching guild data for ${id} : ${e}`);
         });
@@ -939,9 +1010,10 @@ function newGuild(id, key, owner) {
 /**
  * Converts all characters in a string to the normal letter that best represents it
  * @param {string} string The string to process
+ * @returns {string|null}
  */
 function normalizeString(string) {
-    if (!string) return;
+    if (!string) return null;
     let result = '';
     let key = Object.getOwnPropertyNames(characterMap);
     string.split('').forEach(l => {
@@ -954,7 +1026,6 @@ function normalizeString(string) {
     })
     return result;
 };
-//#region String collections
 const characterMap = {//this is probably the worst thing I've ever created // cases are separated because I'm not sure how lenient string.includes() is
     'a': ['A', 'a', 'À', 'Á', 'Â', 'Ã', 'Ä', 'Å', 'Æ', 'æ', 'ä', 'Д'],
     'b': ['B', 'b', 'ß'],
@@ -981,14 +1052,13 @@ const characterMap = {//this is probably the worst thing I've ever created // ca
     'w': ['W', 'w', 'Ŵ', 'ŵ'],
     'x': ['X', 'x'],
     'y': ['Y', 'y', 'Ŷ', 'ŷ', 'Ÿ'],
-    'z': ['Z', 'z', 'Ź', 'ź', 'Ż', 'ż', '��', 'ž']
+    'z': ['Z', 'z', 'Ź', 'ź', 'Ż', 'ż', 'ž']
 };
-//#endregion
 
 /**
  * Logs an event
  * @param {("INFO"|"WARN"|"ERR")} type The event type
- * @param {*} message The event message
+ * @param {string} message The event message
  */
 function log(type, message) {
     let string = `[${type.toUpperCase()}](${Date.now()}) - ${message}`;
@@ -1005,7 +1075,7 @@ function log(type, message) {
 * Documentation at https://wiki.guildwars2.com/wiki/API:Main
 * @param {("guild/"|"account"|"account/achievements"|"account/bank"|"account/dailycrafting"|"account/dungeons"|"account/dyes"|"account/finishers"|"account/gliders"|"account/home/cats"|"account/home/nodes"|"account/inventory"|"account/luck"|"account/mailcarriers"|"account/mapchests"|"account/masteries"|"account/mastery/points"|"account/materials"|"account/minis"|"account/mounts/skins"|"account/mounts/types"|"account/novelties"|"account/outfits"|"account/pvp/heroes"|"account/raids"|"tokeninfo"|"pvp/standings"|"pvp/games"|"pvp/stats"|"commerce/transactions"|"characters"|"account/worldbosses"|"account/wallet"|"account/titles"|"account/skins"|"account/recipes")} path The type of information to request
 * @param {string} token The API token to use
-* @returns {Promise<Object>} The parsed JSON response. If a "text" property exists, it probably is an error
+* @returns {Promise<Object>} The parsed JSON response. If a "text" property exists, it's probably an error
 */
 function apiFetch(path, token) {
     return new Promise((resolve, reject) => {
@@ -1025,6 +1095,22 @@ function apiFetch(path, token) {
             });
         });
     });
+};
+
+/**
+ * Finds and returns server specific settings from the config
+ * Intellisense doesn't have the common sense to disregard selector expressions when all the objects in the array have the same structure...
+ * So this is my workaround....
+ * @param {string} server The Discord server ID
+ * @returns {ServerSettings|null}
+ */
+function fetchSettings(server) {
+    let sett = config.serverSettings[server];
+    if (sett) {
+        return sett;
+    } else {
+        return null;
+    };
 };
 
 /**
@@ -1120,7 +1206,7 @@ client.on("ready", () => {
     }, 135000);
 });
 client.on('guildMemberAdd', (member) => {
-    let serverSettings = config.serverSettings[member.guild.id];
+    let serverSettings = fetchSettings(member.guild.id);
     if (serverSettings.unregisteredRole != null) {//unregistered role is enabled, fetch it
         member.guild.roles.fetch(serverSettings.unregisteredRole).then(r => {//I keep forgetting that roles.fetch() is async
             if (!r) { log('ERR', `Tried to give an unregistered role, but it seems like ${r.id} doesn't exist `); return; };
