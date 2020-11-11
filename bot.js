@@ -357,6 +357,9 @@ class Rank {
 //'close' events are being duplicated
 //could also be app.js
 
+//filter needs to use a different library. This one has serious latency issues
+//use performance tester and find ways to improve this shitty code
+
 //#region Message handler
 client.on("message", (msg) => {
     if (rateLimitMode) return;
@@ -364,12 +367,11 @@ client.on("message", (msg) => {
         msg.channel.send(Embeds.prototype.default("👋 Hey there! My prefix is `" + config.prefix + "` Use `" + config.prefix + "help` to see a list of commands"));
     };
     if (waitList.has(msg.author.id) && msg.channel.type == "dm") { handleWaitResponse(msg.author, msg.content); return };//handle when people reply to the link guide if they're on the waitlist
-    if (msg.channel.type != "dm") {
-        if (msg.content && fetchSettings(msg.guild.id).blockProfanity && msg.deletable && !msg.author.bot && !msg.webhookID) {//check for profanity - ignore if no action can be taken
-            if (filter.isProfane(msg.content) && fetchSettings(msg.guild.id).webhooks != []) {//if theres a bad word and a webhook is setup
-                let fChar = ["#", "$", "!", "&", "%", "?"]
-                let newString = filter.clean(msg.content).replace(/\*/g, function () { return fChar[Math.floor(Math.random() * fChar.length)] })
-                /** @type {{"channel":String, "id":String, "url":String, "token":String?}} */
+
+    if (msg.content && fetchSettings(msg.guild.id).blockProfanity && msg.deletable && !msg.author.bot && !msg.webhookID && msg.channel.type != "dm") {//check for profanity - ignore if no action can be taken
+        if (fetchSettings(msg.guild.id).webhooks != []) {//if theres a bad word and a webhook is setup
+            if (filter.isProfane(msg.content)) {
+                let newString = filter.clean(msg.content).replace(/\*/g, "#")
                 let hook = fetchSettings(msg.guild.id).webhooks.find(w => w.channel == msg.channel.id)
                 let name;
                 if (msg.member.nickname) {
@@ -387,9 +389,10 @@ client.on("message", (msg) => {
                     }));
                 };
                 msg.delete({ "reason": "This message violated the profanity filter", 'timeout': 100 })//delete the message ASAP. Timeout is to give async chunks time
-            };
+            }
         };
     };
+
     if (msg.author.bot || !msg.content.startsWith(config.prefix) || config.blacklist.includes(msg.author.id) || msg.system || msg.webhookID) return;//ignores bots, DMs, people on blacklist, and anything not starting with the prefix
     let messageArray = msg.content.split(" ");
     let command = messageArray[0].substring(config.prefix.length).toLowerCase();
@@ -804,7 +807,7 @@ var queueTick = setInterval(() => {
                     if (account.guilds.includes(l.guild) && !member.roles.cache.has(l.role)) {
                         //this part cant be finished until I find a way to check everyones rank inside a guild
                         member.roles.add(l.role).catch(e => {
-                            log('ERR', `Failed to manage ${member.id}'s roles: ${e}`);
+                            log('ERR', `Failed to give ${member.id} role ${l.role} : ${e}`);
                         });
                     };
                 });
@@ -812,17 +815,18 @@ var queueTick = setInterval(() => {
                 return;
             };
         } else {//unregistered account
-            if (fetchSettings(member.guild.id).unregisteredRole != null) {
+            let unRole = fetchSettings(member.guild.id).unregisteredRole
+            if (unRole) {
                 if (member.roles.cache.has(fetchSettings(member.guild.id).unregisteredRole)) { roleQueue.pop(); return; };//ignore if they already have it
-                member.roles.add(fetchSettings(member.guild.id).unregisteredRole).catch(e => {
-                    log('ERR', `Failed to manage ${member.id}'s roles: ${e}`);
+                member.roles.add(unRole).catch(e => {
+                    log('ERR', `Failed to give ${member.id} unregisteredRole: ${e}`);
                 });
             }
             roleQueue.pop();
             return;
         }
         //anything below this line should show up as 'unreachable.' We want it that way ;)
-        console.log('test')
+        console.log(`Please check the queue interval. Unreachable code was triggered! Search for: MOWCMSJIN`)
     }
 }, queueDelay);
 //file backup
@@ -1274,80 +1278,4 @@ process.on('message', (m) => {//manages communication with parent
             break;
     }
 })
-//#endregion
-
-//#region Website gateway
-//under development
-const server = http.createServer((req, res) => {
-    let jsonRes = {};//the response object that will always be returned
-    let auth = req.headers.authorization;//used to make sure the user actually has permission for this
-    let serverRegex = /\d{17,21}/;//used to recognize server specific settings
-    let jsonResponse = true;//used to specify when the response is different
-    try {
-        if (req.method == "GET") {//used for fetching bot data
-            let url = req.url.split("/");
-            let server = url[1].match(serverRegex);
-            if (server) {//get data from server
-                if (!auth) {//no auth
-                    jsonRes.code = 401;
-                    jsonRes.message = "This endpoint requires authorization via Discord";
-                } else {//auth provided
-
-                }
-            } else {//other requests
-                switch (url[1]) {
-                    case "endpoints":
-                        jsonRes.message = "Discord server IDs may also be used in URLs. e.g. /767051229184131091 for info on this server. However, authentication is required for this. Documentation can be found on GitHub";
-                        jsonRes.endpoints = ["/", "/endpoints", "/stats"];
-                        jsonRes.code = 200;
-                        break;
-
-
-                    case "stats":
-                        jsonRes.userCount = accounts.legnth;
-                        jsonRes.guildCount = config.guilds.length;
-                        jsonRes.uptime = Date.now() - config.lastBoot;
-                        jsonRes.code = 200;
-                        break;
-
-                    case "consent":
-                        jsonResponse = false;
-                        //this needs to be updated
-                        res.writeHead(302, { 'Location': consentUrl });
-                        break;
-
-                    case "":
-                        jsonRes.message = "You aren't supposed to visit this url like a web page, silly";
-                        jsonRes.code = 200;
-                        break;
-
-                    default:
-                        jsonRes.message = "Unknown request";
-                        jsonRes.code = 404;
-                        break;
-                };
-            };
-        } else if (req.method == "POST") {//used for changing settings
-
-        } else {//unknown method - probably a bad thing
-            jsonRes.message = "Method not allowed";
-            jsonRes.code = 400;
-        };
-    } catch (error) {//let the client know if there are any errors
-        jsonRes.message = error.message;
-        jsonRes.code = 500;
-    };
-    if (jsonResponse) {
-        res.statusCode = jsonRes.code;
-        res.write(JSON.stringify(jsonRes));
-        res.end();
-    };
-}).listen(8080);
-server.on('error', (err) => {
-    log('ERR', `Internal API: ${err.name} : ${err.message} : ${err.stack}`);
-    if (err.name == "Error:listen EADDRINUSE") {
-        log('WARN', "Looks like the bot is already running - shutting down...")
-        process.exit(1)
-    }
-});
 //#endregion
