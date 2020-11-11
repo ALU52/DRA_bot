@@ -384,7 +384,7 @@ client.on("message", (msg) => {
                         content: newString
                     }));
                 };
-                msg.delete({ "reason": "This message violated the profanity filter", 'timeout': 10 })//delete the message ASAP. Timeout is to give async chunks time
+                msg.delete({ "reason": "This message violated the profanity filter", 'timeout': 100 })//delete the message ASAP. Timeout is to give async chunks time
             };
         };
     };
