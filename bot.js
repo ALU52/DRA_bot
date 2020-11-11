@@ -353,7 +353,9 @@ class Rank {
 
 //update embed colors with the colors object
 
-//a bug caused accounts.json to be wiped... look into this
+//memory leak detected with event emitter
+//'close' events are being duplicated
+//could also be app.js
 
 //#region Message handler
 client.on("message", (msg) => {
@@ -1189,7 +1191,7 @@ function timeDifference(previous) {
 let scrollInterval;
 let dataCheck
 let msn = 0;
-client.on("ready", () => {
+client.once("ready", () => {
     console.clear();
     setTimeout(() => {
         client.user.setPresence({ status: "idle", activity: { name: "just logged in", type: "PLAYING" } });
@@ -1220,10 +1222,13 @@ client.on('guildMemberAdd', (member) => {
     };
 });
 client.on('disconnect', () => {
-    log('ERR', `I've lost connection to the Discord API!`);
+    log('ERR', `I've lost connection!`);
 })
 client.on('warn', (warn) => {
     log('WARN', warn);
+})
+process.on('warning', (err) => {
+    log('WARN', `${err.name} : ${err.message}\n${err.stack}`)
 })
 client.on('rateLimit', (data) => {
     log('WARN', `Ratelimit: ${data.route} / ${data.path} : ${data.method} - ignoring messages for a sec`)
@@ -1233,10 +1238,10 @@ client.on('rateLimit', (data) => {
     }, 2500);
 })
 client.on('error', (err) => {
-    log('ERR', `Uncaught exception: ${err.name}:${err.message} - ${err.stack}`);
+    log('ERR', `Uncaught exception: ${err.name}:${err.message}\n${err.stack}`);
 })
 process.on('uncaughtException', (err) => {
-    log('ERR', `Uncaught exception: ${err.name}:${err.message} - ${err.stack}`);
+    log('ERR', `Uncaught exception: ${err.name}:${err.message}\n${err.stack}`);
 })
 process.on('message', (m) => {//manages communication with parent
     switch (m) {
