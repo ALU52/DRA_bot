@@ -376,7 +376,7 @@ client.on("message", (msg) => {
                     name = msg.author.username;
                 }
                 if (hook) {
-                    webPush.open("POST", hook.url)
+                    webPush.open("POST", hook.url);
                     webPush.setRequestHeader('Content-type', 'application/json');//set headers
                     webPush.send(JSON.stringify({
                         username: name,
@@ -384,7 +384,7 @@ client.on("message", (msg) => {
                         content: newString
                     }));
                 };
-                msg.delete({ "reason": "This message violated the profanity filter", 'timeout': 100 })//delete the message ASAP
+                msg.delete({ "reason": "This message violated the profanity filter", 'timeout': 10 })//delete the message ASAP. Timeout is to give async chunks time
             };
         };
     };
@@ -655,7 +655,7 @@ client.on("message", (msg) => {
                                 return;
                             }
                             fetchSettings(msg.guild.id).blockProfanity = false
-                            msg.guild.fetchWebhooks().then(hooks => {//fetch all hooks
+                            msg.guild.fetchWebhooks().then(hooks => {//fetch all hooks // skips cache to avoid deleting hooks that were already deleted for some reason
                                 hooks.forEach(hook => {//for each
                                     let ind = fetchSettings(msg.guild.id).webhooks.findIndex(h => h.url == hook.url)//find the hook under the server object
                                     if (ind != -1) {//if it exists
@@ -665,7 +665,7 @@ client.on("message", (msg) => {
                                         })
                                     }
                                 })
-                                fetchSettings(msg.guild.id).webhooks = []
+                                fetchSettings(msg.guild.id).webhooks = [];//set the array to empty just to be sure
                             })
                             msg.channel.send(Embeds.prototype.success("Profanity filter disabled"))
                             return;
@@ -1211,9 +1211,11 @@ client.on('guildMemberAdd', (member) => {
         member.guild.roles.fetch(serverSettings.unregisteredRole).then(r => {//I keep forgetting that roles.fetch() is async
             if (!r) { log('ERR', `Tried to give an unregistered role, but it seems like ${r.id} doesn't exist `); return; };
             if (!member.manageable) { log('ERR', `I don't have permissions to manage${member.id} in ${member.guild.id}`); return; };
-            member.roles.add(r);//so help me god if this throws errors
+            member.roles.add(r).catch((err) => {
+                log('ERR', `UnregisteredRole for ${member.guild.name} seems to be misconfigured!\n${err.name} : ${err.message}`);
+            });
         }).catch((err) => {
-            log('ERR', `UnregisteredRole for ${member.guild.name} seems to be misconfigured!\n${err.name} : ${err.message}`)
+            log('ERR', `UnregisteredRole for ${member.guild.name} seems to be misconfigured!\n${err.name} : ${err.message}`);
         });
     };
 });
