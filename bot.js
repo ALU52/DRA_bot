@@ -10,7 +10,7 @@ var XMLHttpRequest = require("xhr2");
 var webPush = new XMLHttpRequest();
 
 var Filter = require('bad-words');
-var filter = new Filter({ exclude: ["damn", "hell", "god"] });//I allowed a few because we ain't children
+var filter = new Filter({ exclude: ["damn", "hell", "god", "crap"] });//I allowed a few because we ain't children
 
 const client = new Discord.Client();//The bot client... duhhh
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000", "default": "#7289DA" };
