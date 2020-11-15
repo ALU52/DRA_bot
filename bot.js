@@ -9,9 +9,10 @@ let accounts = require("./accounts.json");
 var XMLHttpRequest = require("xhr2");
 var webPush = new XMLHttpRequest();
 
-var wordExeptions = ["crap", "ass", "damn", "hell", "god"];
-var BadWords = [];
-require("badwords/array").forEach(w => { if (!wordExeptions.includes(w)) BadWords.push(w) })
+//some of these words are too commonly used in safe words, so I'm just having the bot ignore them
+var wordExceptions = ["crap", "ass", "damn", "hell", "god", "tit", "cum", "cums"];
+var BadWords = [];//build the bad word list on startup
+require("badwords/array").forEach(w => { if (!wordExceptions.includes(w.toLowerCase())) BadWords.push(w) })
 var wordRegex = new RegExp(BadWords.join("|"), 'gi');
 const { black } = require("color-name");
 const { count } = require("console");
@@ -386,7 +387,7 @@ client.on("message", (msg) => {
     if (msg.content && fetchSettings(msg.guild.id).blockProfanity && msg.deletable && !msg.author.bot && !msg.webhookID && msg.channel.type != "dm") {//check for profanity - ignore if no action can be taken
         if (fetchSettings(msg.guild.id).webhooks != []) {//if theres a bad word and a webhook is setup
             let rawMessage = msg.content.replace(/\s/g, "")//removes spaces that try to bypass it
-            let cleanedMessage = rawMessage.replace(wordRegex, function (match) { return match.replace(/./g, '#'); });
+            let cleanedMessage = rawMessage.replace(wordRegex, function (match) { return match.replace(/./g, '■'); });
             if (cleanedMessage != rawMessage) {//if changes were made, delete the message and replace it
                 let spaceLocations = []
                 let counter = 0;
