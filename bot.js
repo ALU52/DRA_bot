@@ -9,9 +9,12 @@ let accounts = require("./accounts.json");
 var XMLHttpRequest = require("xhr2");
 var webPush = new XMLHttpRequest();
 
-var Filter = require('bad-words');
+var wordExeptions = ["crap", "ass", "damn", "hell", "god"];
+var BadWords = [];
+require("badwords/array").forEach(w => { if (!wordExeptions.includes(w)) BadWords.push(w) })
+var wordRegex = new RegExp(BadWords.join("|"), 'gi');
 const { black } = require("color-name");
-var filter = new Filter({ exclude: ["damn", "hell", "god", "crap"] });//I allowed a few because we ain't children
+const { count } = require("console");
 
 const client = new Discord.Client();//The bot client... duhhh
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000", "default": "#7289DA" };
@@ -369,10 +372,23 @@ client.on("message", (msg) => {
     };
     if (waitList.has(msg.author.id) && msg.channel.type == "dm") { handleWaitResponse(msg.author, msg.content); return };//handle when people reply to the link guide if they're on the waitlist
 
+    //filter area
     if (msg.content && fetchSettings(msg.guild.id).blockProfanity && msg.deletable && !msg.author.bot && !msg.webhookID && msg.channel.type != "dm") {//check for profanity - ignore if no action can be taken
         if (fetchSettings(msg.guild.id).webhooks != []) {//if theres a bad word and a webhook is setup
-            if (filter.isProfane(msg.content)) {
-                let newString = filter.clean(msg.content).replace(/\*/g, "#")
+            let rawMessage = msg.content.replace(/\s/g, "")//removes spaces that try to bypass it
+            let cleanedMessage = rawMessage.replace(wordRegex, function (match) { return match.replace(/./g, '#'); });
+            if (cleanedMessage != rawMessage) {//if changes were made, delete the message and replace it
+                let spaceLocations = []
+                let counter = 0;
+                msg.content.split("").forEach(c => {//finds spaces throughout the message
+                    if (c == " ") {
+                        spaceLocations.push(counter)
+                    }
+                    counter++;
+                })
+                spaceLocations.forEach(l => {//puts them back, to prevent destruction while filtering
+                    cleanedMessage = cleanedMessage.substring(0, l) + " " + cleanedMessage.substr(l)
+                })
                 let hook = fetchSettings(msg.guild.id).webhooks.find(w => w.channel == msg.channel.id)
                 let name;
                 if (msg.member.nickname) {
@@ -386,14 +402,14 @@ client.on("message", (msg) => {
                     webPush.send(JSON.stringify({
                         username: name,
                         avatar_url: msg.author.avatarURL(),
-                        content: newString
+                        content: cleanedMessage
                     }));
                 };
-                msg.delete({ "reason": "This message violated the profanity filter", 'timeout': 100 })//delete the message ASAP. Timeout is to give async chunks time
+                msg.delete({ "reason": "This message violated the profanity filter" })//delete the message ASAP. Timeout is to give async chunks time
             }
         };
     };
-
+    //
     if (msg.author.bot || !msg.content.startsWith(config.prefix) || config.blacklist.includes(msg.author.id) || msg.system || msg.webhookID) return;//ignores bots, DMs, people on blacklist, and anything not starting with the prefix
     let messageArray = msg.content.split(" ");
     let command = messageArray[0].substring(config.prefix.length).toLowerCase();
@@ -808,8 +824,9 @@ var queueTick = setInterval(() => {
                     return;
                 };
             } else {//nah, the cache is still valid - now apply roles
-                if (!fetchSettings(member.guild.id).links || fetchSettings(member.guild.id).links == []) { roleQueue.pop(); return; }
-                fetchSettings(member.guild.id).links.forEach(l => {
+                var lSettings = fetchSettings(member.guild.id);
+                if (!lSettings || !lSettings.links || lSettings.links == []) { roleQueue.pop(); return; }
+                lSettings.links.forEach(l => {
                     if (!l || typeof l.role != 'string') return;
                     if (account.guilds.includes(l.guild) && !member.roles.cache.has(l.role)) {
                         //this part cant be finished until I find a way to check everyones rank inside a guild
@@ -822,10 +839,10 @@ var queueTick = setInterval(() => {
                 return;
             };
         } else {//unregistered account
-            let unRole = fetchSettings(member.guild.id).unregisteredRole
-            if (unRole) {
-                if (member.roles.cache.has(fetchSettings(member.guild.id).unregisteredRole)) { roleQueue.pop(); return; };//ignore if they already have it
-                member.roles.add(unRole).catch(e => {
+            let cSettings = fetchSettings(member.guild.id)
+            if (cSettings) {
+                if (member.roles.cache.has(cSettings.unregisteredRole)) { roleQueue.pop(); return; };//ignore if they already have it
+                member.roles.add(cSettings.unregisteredRole).catch(e => {
                     log('ERR', `Failed to give ${member.id} unregisteredRole: ${e}`);
                 });
             }
