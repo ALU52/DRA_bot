@@ -624,6 +624,7 @@ client.on("message", (msg) => {
 
         case "server":
             //depreciated command
+            if (msg.author.id != config.ownerID) { msg.react(emojis.cross); return; }
             if (msg.channel.type == "dm") { msg.channel.send(Embeds.prototype.error("This command can only be used in servers")); return; };
             let s = JSON.stringify(fetchSettings(msg.guild.id), null, 1);//try to format while keeping it compact for embed
             msg.channel.send("```json\n" + s + "```");
