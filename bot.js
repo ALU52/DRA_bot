@@ -281,6 +281,7 @@ class ServerSettings {
         this.unregisteredRole = ""
         /**@type {Link[]} Used to link guild ranks to Discord roles*/
         this.links = []
+        return this;
     }
 }
 class Webhook {
@@ -292,6 +293,7 @@ class Webhook {
     constructor(channel, url) {
         this.channel = channel
         this.url = url
+        return this;
     }
 }
 class Link {
@@ -305,6 +307,7 @@ class Link {
         this.rank = rank
         this.role = role
         this.guilds = guild
+        return this;
     }
 }
 class Account {
@@ -321,6 +324,7 @@ class Account {
         this.time = Date.now()
         this.guilds = guilds
         this.gwId = gwId
+        return this;
     }
 }
 class Guild {
@@ -340,6 +344,7 @@ class Guild {
         /**@type {string[]} */
         this.aliases = []
         this.leader = leader
+        return this;
     }
 };
 class Rank {
@@ -351,6 +356,7 @@ class Rank {
     constructor(id, order) {
         this.id = id;
         this.order = order;
+        return this;
     }
 }
 //#endregion
@@ -405,7 +411,7 @@ client.on("message", (msg) => {
                         content: cleanedMessage
                     }));
                 };
-                msg.delete({ "reason": "This message violated the profanity filter" })//delete the message ASAP. Timeout is to give async chunks time
+                msg.delete({ "reason": "This message violated the profanity filter" })//delete the message
             }
         };
     };
