@@ -281,7 +281,16 @@ class ServerSettings {
         this.unregisteredRole = ""
         /**@type {Link[]} Used to link guild ranks to Discord roles*/
         this.links = []
-        return this;
+    }
+}
+
+class PendingWebhook {
+    /**
+     * Used to represent a channel in the queue
+     * @param {Discord.Channel} channel The channel to create a webhook for
+     */
+    constructor(channel) {
+        this.channel = channel
     }
 }
 class Webhook {
@@ -293,7 +302,6 @@ class Webhook {
     constructor(channel, url) {
         this.channel = channel
         this.url = url
-        return this;
     }
 }
 class Link {
@@ -307,7 +315,6 @@ class Link {
         this.rank = rank
         this.role = role
         this.guilds = guild
-        return this;
     }
 }
 class Account {
@@ -324,7 +331,6 @@ class Account {
         this.time = Date.now()
         this.guilds = guilds
         this.gwId = gwId
-        return this;
     }
 }
 class Guild {
@@ -344,7 +350,6 @@ class Guild {
         /**@type {string[]} */
         this.aliases = []
         this.leader = leader
-        return this;
     }
 };
 class Rank {
@@ -356,7 +361,6 @@ class Rank {
     constructor(id, order) {
         this.id = id;
         this.order = order;
-        return this;
     }
 }
 //#endregion
@@ -713,17 +717,20 @@ client.on("message", (msg) => {
                                 if (r) {
                                     if (msg.guild.me.hasPermission('MANAGE_WEBHOOKS')) {
                                         if (!fetchSettings(msg.guild.id).webhooks) fetchSettings(msg.guild.id).webhooks = []//start setup
-                                        msg.guild.channels.cache.filter(c => c.type == 'text').forEach(ch => {//this may be causing ratelimit issues
+                                        let errors = false;
+                                        //this part should be made async, with a queue system or something // I learned the hard way: that the CACHE IS NOT RELIABLE ANYMORE
+                                        msg.guild.channels.valueOf().filter(c => c.type == 'text').forEach(ch => {//this may be causing ratelimit issues
                                             client.channels.fetch(ch.id, true).then(channel => {//fetch and create webhook - use cache to avoid ratelimit
                                                 channel.createWebhook("Profanity filter: #" + ch.name, { "avatar": "https://raw.githubusercontent.com/ALU52/DRA_bot/master/profanity.png", "reason": "Filter enabled by " + msg.author.username }).then(webhook => {
                                                     fetchSettings(msg.guild.id).webhooks.push(new Webhook(webhook.channelID, webhook.url))//save it to memory for later use
                                                 }).catch((err) => {
+                                                    errors = true;
                                                     log('ERR', `Failed to create webhook: ${err.message}`)
                                                     fetchSettings(msg.guild.id).blockProfanity = false
-                                                    msg.channel.send(Embeds.prototype.error("Something went wrong during filter setup"))
-                                                    return;
+                                                    msg.channel.send(Embeds.prototype.error(`Something went wrong during filter setup\n${err.message}`))
                                                 })
                                             })
+                                            if (errors) return;
                                         })
                                         fetchSettings(msg.guild.id).blockProfanity = true//enable the filter
                                         msg.channel.send(Embeds.prototype.success("Profanity filter enabled"))//let them know it finished afterwards
