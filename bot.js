@@ -1262,8 +1262,6 @@ process.on('message', (m) => {//manages communication with parent
             clearInterval(queUpUsers);//stop adding users to the queue - try to let the queue finish before stopping
             clearInterval(scrollInterval);//stop updating presence and change to restart message
             if (client.user) client.user.setPresence({ status: "dnd", activity: { name: "with system files", type: "PLAYING" }, });
-            server.removeAllListeners();//stop listening for API events
-            server.close();//close the API server
             stopBackup();//save one final time and stop writing to the files
             setInterval(() => {
                 if (roleQueue.length == 0 && waitList.size == 0) {//shutdown conditions
