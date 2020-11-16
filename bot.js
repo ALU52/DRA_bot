@@ -9,8 +9,9 @@ let accounts = require("./accounts.json");
 var XMLHttpRequest = require("xhr2");
 var webPush = new XMLHttpRequest();
 
-//some of these words are too commonly used in safe words, so I'm just having the bot ignore them
-var wordExceptions = ["crap", "ass", "damn", "hell", "god", "tit", "cum", "cums"];
+//some of these words cause too many false positives, so I'm having the bot ignore them
+//others are just flat out allowed because we're not children.
+var wordExceptions = ["crap", "ass", "damn", "hell", "god", "tit", "balls", "cum", "cums", "spac"];
 var BadWords = [];//build the bad word list on startup
 require("badwords/array").forEach(w => { if (!wordExceptions.includes(w.toLowerCase())) BadWords.push(w) })
 var wordRegex = new RegExp(BadWords.join("|"), 'gi');
@@ -846,7 +847,7 @@ var queueTick = setInterval(() => {
                     if (account.guilds.includes(l.guild) && !member.roles.cache.has(l.role)) {
                         //this part cant be finished until I find a way to check everyones rank inside a guild
                         member.roles.add(l.role).catch(e => {
-                            log('ERR', `Failed to give ${member.id} role ${l.role} : ${e}`);
+                            //do nothing because this is flooding the log like crazy
                         });
                     };
                 });
