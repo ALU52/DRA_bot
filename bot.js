@@ -9,9 +9,8 @@ let accounts = require("./accounts.json");
 var XMLHttpRequest = require("xhr2");
 var webPush = new XMLHttpRequest();
 
-//some of these words cause too many false positives, so I'm having the bot ignore them
-//others are just flat out allowed because we're not children.
-var BadWords = ['shit', 'fuck'];//build the bad word list on startup
+//this filter has been causing more problems than solutions, it may be removed in the future
+var BadWords = ['shit', 'fuck'];
 var wordRegex = new RegExp(BadWords.join("|"), 'gi');
 const { black } = require("color-name");
 const { count } = require("console");
@@ -110,7 +109,7 @@ class Embeds {
             return {
                 "embed": {
                     "title": "Help",
-                    "description": "My job is to integrate this server with the Gw2 API\nUse 'help <command>' to see more info about it\n**Commands:**\n\`\`\`\n> Help\n> Ping\n> Link\n> Unlink\n> Info\`\`\`\n**Admin commands:**\n\`\`\`\n> roleAdd\n> roleRemove\n> roles\`\`\`",
+                    "description": "My job is to integrate this server with the Gw2 API\nUse 'help <command>' to see more info about it\n**Commands:**\n\`\`\`\n> Help\n> Ping\n> Link\n> Unlink\n> Info\`\`\`\n**Admin commands:**\n\`\`\`\n> add\n> remove\n> roles\`\`\`",
                     "color": colors.default,
                 }
             }
@@ -167,22 +166,22 @@ class Embeds {
                     }
                     break;
                 ///////////////////////////////////////////////////////////////////////// WORK IN PROGRESS
-                case "roleadd":
+                case "add":
                     return {
                         "embed": {
-                            "title": "roleAdd",
+                            "title": "add",
                             "description": "This topic is under construction",
                             "color": colors.error,//dont forget to change the color back
                         }
                     }
                     break;
 
-                case "roleremove":
+                case "remove":
                     return {
                         "embed": {
-                            "title": "roleRemove",
-                            "description": "This topic is under construction",
-                            "color": colors.error,
+                            "title": "remove",
+                            "description": "This command will make me forget about roles",
+                            "color": colors.default,
                         }
                     }
                     break;
@@ -282,6 +281,8 @@ class ServerSettings {
         this.unregisteredRole = ""
         /**@type {Link[]} Used to link guild ranks to Discord roles*/
         this.links = []
+        /** @type {String[]} */
+        this.profanityRoles = []
     }
 }
 
@@ -382,44 +383,60 @@ client.on("message", (msg) => {
         msg.channel.send(Embeds.prototype.default("👋 Hey there! My prefix is `" + config.prefix + "` Use `" + config.prefix + "help` to see a list of commands"));
     };
     if (waitList.has(msg.author.id) && msg.channel.type == "dm") { handleWaitResponse(msg.author, msg.content); return };//handle when people reply to the link guide if they're on the waitlist
-
+    /** @type {ServerSettings|null} */
+    let serverSettings = null;
+    if (msg.guild) serverSettings = fetchSettings(msg.guild.id)
     //filter area
-    if (msg.content && fetchSettings(msg.guild.id).blockProfanity && msg.deletable && !msg.author.bot && !msg.webhookID && msg.channel.type != "dm") {//check for profanity - ignore if no action can be taken
-        if (fetchSettings(msg.guild.id).webhooks != []) {//if theres a bad word and a webhook is setup
-            let rawMessage = msg.content.replace(/\s/g, "")//removes spaces that try to bypass it
-            let cleanedMessage = rawMessage.replace(wordRegex, function (match) { return match.replace(/./g, '.'); });
-            if (cleanedMessage != rawMessage) {//if changes were made, delete the message and replace it
-                let spaceLocations = []
-                let counter = 0;
-                msg.content.split("").forEach(c => {//finds spaces throughout the message
-                    if (c == " ") {
-                        spaceLocations.push(counter)
+    if (serverSettings) {///only even tries to check in servers
+        if (msg.content && serverSettings.blockProfanity && msg.deletable && !msg.author.bot && !msg.webhookID && msg.channel.type == 'text') {//check for profanity - ignore if no action can be taken
+            let needsFilter = false;
+            if (serverSettings.profanityRoles.length > 0) {//profanity roles setup - only filter if they have one
+                serverSettings.profanityRoles.forEach(r => {
+                    if (msg.member.roles.cache.has(r)) {
+                        needsFilter = true;
                     }
-                    counter++;
                 })
-                spaceLocations.forEach(l => {//puts them back, to prevent destruction while filtering
-                    cleanedMessage = cleanedMessage.substring(0, l) + " " + cleanedMessage.substr(l)
-                })
-                let hook = fetchSettings(msg.guild.id).webhooks.find(w => w.channel == msg.channel.id)
-                let name;
-                if (msg.member.nickname) {
-                    name = msg.member.nickname;
-                } else {
-                    name = msg.author.username;
-                }
-                if (hook) {
-                    webPush.open("POST", hook.url);
-                    webPush.setRequestHeader('Content-type', 'application/json');//set headers
-                    webPush.send(JSON.stringify({
-                        username: name,
-                        avatar_url: msg.author.avatarURL(),
-                        content: cleanedMessage
-                    }));
+            } else {
+                needsFilter = true;
+            }
+            if (needsFilter) {//the role cache takes a bit to update, so people can't just change roles when they feel like cussing
+                if (serverSettings.webhooks != []) {//if theres a bad word and a webhook is setup
+                    let rawMessage = msg.content.replace(/\s/g, "")//removes spaces that try to bypass it
+                    let cleanedMessage = rawMessage.replace(wordRegex, function (match) { return match.replace(/./g, '.'); });
+                    if (cleanedMessage != rawMessage) {//if changes were made, delete the message and replace it
+                        let spaceLocations = []
+                        let counter = 0;
+                        msg.content.split("").forEach(c => {//finds spaces throughout the message
+                            if (c == " ") {
+                                spaceLocations.push(counter)
+                            }
+                            counter++;
+                        })
+                        spaceLocations.forEach(l => {//puts them back, to prevent destruction while filtering
+                            cleanedMessage = cleanedMessage.substring(0, l) + " " + cleanedMessage.substr(l)
+                        })
+                        let hook = serverSettings.webhooks.find(w => w.channel == msg.channel.id)
+                        let name;
+                        if (msg.member.nickname) {
+                            name = msg.member.nickname;
+                        } else {
+                            name = msg.author.username;
+                        }
+                        if (hook) {
+                            webPush.open("POST", hook.url);
+                            webPush.setRequestHeader('Content-type', 'application/json');//set headers
+                            webPush.send(JSON.stringify({
+                                username: name,
+                                avatar_url: msg.author.avatarURL(),
+                                content: cleanedMessage
+                            }));
+                        };
+                        msg.delete({ "reason": "This message violated the profanity filter" })//delete the message
+                    }
                 };
-                msg.delete({ "reason": "This message violated the profanity filter" })//delete the message
             }
         };
-    };
+    }
     //
     if (msg.author.bot || !msg.content.startsWith(config.prefix) || config.blacklist.includes(msg.author.id) || msg.system || msg.webhookID) return;//ignores bots, DMs, people on blacklist, and anything not starting with the prefix
     let messageArray = msg.content.split(" ");
@@ -440,7 +457,7 @@ client.on("message", (msg) => {
             break;
 
         case "blacklist":
-            if (msg.author.id != config.ownerID) { msg.react(emojis.cross); return; };
+            if (msg.author.id != config.ownerID) { msg.react(emojis.cross); return; };//locked for owner only
             if (args[0].toLowerCase() == "add") {
                 if (args[1]) {
                     client.users.fetch(args[1]).then(bMem => {//Callback needed for fetch being async. CURSE YOU DISCORD.JS CACHE!!!!
@@ -482,7 +499,7 @@ client.on("message", (msg) => {
             totalUsers.forEach(u => {//finds the amount of unregistered users in the server
                 if (accounts.find(a => a.id == u.id)) serverCount++;
             });
-            msg.channel.send({
+            msg.channel.send({//god please forgive me for these following lines
                 "embed": {
                     "title": "Info",
                     "url": "https://github.com/ALU52/DRA_bot",
@@ -513,75 +530,116 @@ client.on("message", (msg) => {
             };
             break;
 
-        case "roleadd":
-            if (msg.channel.type == "dm") { msg.channel.send(Embeds.prototype.error("This command can only be used in servers")); return; };
-            if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.channel.send(Embeds.prototype.error("Sorry, only the server staff can use this")); return; };
-            if (args.length != 3) {//show help message if args are wrong
-                msg.channel.send(Embeds.prototype.default(`This command links a role to a guild to be assigned automatically\n**Usage:** roleAdd <roleID> <rank> <guild>\nUse '${config.prefix}guild' to see available ranks`));
-                return;
-            } else {
-                //should search for the guild tag first
-                let guild = searchGuilds(args[2]);//search for the guild
-                if (!guild) { Embeds.prototype.error(`I couldn't find any guilds under "${args[2]}"\nYou may have to link your account first`); return };
-                let role = msg.guild.roles.cache.find(r => r.id == args[0]);
-                let rank = parseInt(args[1]);//this only supports single digits - this will need to be changed later
-                if (rank === NaN) { msg.channel.send(Embeds.prototype.error(`Use this command without arguments to see its usage`)); return; };
-                if (!role) { msg.channel.send(Embeds.prototype.error("It looks like that role doesn't exist")); return; };
-                prompt(msg.author, msg.channel, `This will link <@&${role.id}> to ${guild.name}\nContinue?`).then(r => {
-                    if (r) {
-                        //add the role link to the server under the guild
-                        let newRole = new Link(rank, role.id, guild.id);
-                        if (!fetchSettings(msg.guild.id).links) {//if its null and needs to be set up
-                            fetchSettings(msg.guild.id).links = [newRole]
-                        } else {//already setup, push to it
-                            fetchSettings(msg.guild.id).links.push(newRole)
-                        }
-                        /////////////////////////////////////////////////
-                        msg.channel.send(Embeds.prototype.success(`Link successful`));
-                    } else {
-                        msg.channel.send(Embeds.prototype.error("No changes were made"));
-                    }
-                }).catch(() => {
-                    msg.channel.send(Embeds.prototype.error("No changes were made"));
-                });
-            };
-            break;
-
-        case "roleremove":
+        case "add":
             if (msg.channel.type == "dm") { msg.reply("this command can only be used in servers"); return; };
             if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.channel.send(Embeds.prototype.error("Sorry, only the server staff can use this")); return; };
-            if (args.length === 0) {//show help message
-                msg.channel.send(Embeds.prototype.default("This command unlinks a role from a guild\nUsage: unlink <roleID>"));
-            } else {//looks like this part needs to be re-written too
-                let role = msg.guild.roles.cache.find(r => r.id == args[0]);
+            if (!args[0]) { msg.channel.send(Embeds.prototype.default(`Usage: ${config.prefix}add [profanityRole/link]`)); return; }
+            if (args[0].toLowerCase() == "link") {
+                //syntax: add (0)link (1)[roleID] (2)[rank] (3)[guild name/tag]
+                if (args.length != 4) {//show help message if args are wrong
+                    msg.channel.send(Embeds.prototype.default(`This command links a role to a guild to be assigned automatically\n**Usage:** add link <roleID> <rank> <guild>\nUse '${config.prefix}guild' to see available ranks`));
+                    return;
+                } else {
+                    //should search for the guild tag first
+                    let guild = searchGuilds(args[3]);//search for the guild
+                    if (!guild) { Embeds.prototype.error(`I couldn't find any guilds under "${args[3]}"\nYou may have to link your account first`); return };
+                    let role = msg.guild.roles.cache.find(r => r.id == args[1]);
+                    if (!role && msg.mentions.roles.size == 1) role = msg.mentions.roles.first();
+                    let rank = parseInt(args[2]);//this only supports single digits - this will need to be changed later
+                    if (rank === NaN) { msg.channel.send(Embeds.prototype.error(`Use this command without arguments to see its usage`)); return; };
+                    if (!role) { msg.channel.send(Embeds.prototype.error("It looks like that role doesn't exist")); return; };
+                    prompt(msg.author, msg.channel, `This will link <@&${role.id}> to ${guild.name}\nContinue?`).then(r => {
+                        if (r) {
+                            //add the role link to the server under the guild
+                            let newRole = new Link(rank, role.id, guild.id);
+                            if (!serverSettings.links) {//if its null and needs to be set up
+                                serverSettings.links = [newRole]
+                            } else {//already setup, push to it
+                                serverSettings.links.push(newRole)
+                            }
+                            msg.channel.send(Embeds.prototype.success(`Link successful`));
+                        } else {
+                            msg.channel.send(Embeds.prototype.error("No changes were made"));
+                        }
+                    }).catch(() => {
+                        msg.channel.send(Embeds.prototype.error("No changes were made"));
+                    });
+                };
+                /////////////////////////////////////////////////
+            } else if (args[0].toLowerCase() == "profanityrole") {
+                //syntax: add (0)profanityRole (1)[roleID]
+                /** @type {Discord.Role} */
+                let role;
+                if (msg.mentions.roles.size == 1) {
+                    role = msg.mentions.roles.first();
+                } else if (args[1]) {
+                    role = msg.guild.roles.cache.find(r => r.id == args[1]);
+                } else { msg.channel.send(Embeds.prototype.default(`Usage: ${config.prefix}add profanityRole <role>`)); return; }
                 if (!role) { msg.channel.send(Embeds.prototype.error("This role doesn't exist")); return; };
+                if (serverSettings.profanityRoles.includes(role.id)) {
+                    msg.channel.send(Embeds.prototype.error("This role is already on the list"))
+                } else {
+                    serverSettings.profanityRoles.push(role.id)
+                    msg.channel.send(Embeds.prototype.default(`<@&${role.id}> was added to the list`))
+                }
+            } else {
+                msg.channel.send(Embeds.prototype.default(`Usage: ${config.prefix}add [profanityRole/link]`))
+            }
+            break;
+
+        case "remove":
+            if (msg.channel.type == "dm") { msg.reply("this command can only be used in servers"); return; };
+            if (!(msg.member.permissions.has('MANAGE_GUILD' || msg.member.permissions.has('ADMINISTRATOR')))) { msg.channel.send(Embeds.prototype.error("Sorry, only the server staff can use this")); return; };
+            //syntax: remove (0)[roleID]
+            if ((args.length != 1 && msg.mentions.roles.size == 0) || msg.mentions.roles.size > 1) {//show help message
+                msg.channel.send(Embeds.prototype.default("This command unlinks a role from a guild\nUsage: remove <role>"));
+            } else {
+                /** @type {Discord.Role} */
+                let role;
+                if (msg.mentions.roles.size != 0) {
+                    role = msg.mentions.roles.first();
+                } else {
+                    role = msg.guild.roles.cache.find(r => r.id == args[0]);
+                }
+                if (!role) { msg.channel.send(Embeds.prototype.error("This role doesn't exist")); return; };
+                //see if its a link or profanity role
+                let profanityRoleMode = false;
+                let remRole = serverSettings.links.find(r => r.role == role.id);
+                if (!remRole) { remRole = serverSettings.profanityRoles.find(r => r == role.id); profanityRoleMode = true; }
                 try {
-                    let remRole = fetchSettings(msg.guild.id).links.find(r => r.role == args[0])
                     if (!remRole) {
-                        msg.channel.send(Embeds.prototype.error("This role isn't linked to any guilds"))
+                        msg.channel.send(Embeds.prototype.error("This role isn't linked to anything"));
                         return;
                     } else {
-                        let remIndex = fetchSettings(msg.guild.id).links.findIndex(r => role == args[0])
-                        msg.channel.send(Embeds.prototype.success(`<@&${remRole.role}> was unlinked`))
-                        fetchSettings(msg.guild.id).links.splice(remIndex)
+                        if (profanityRoleMode) {//delete a profanity role instead
+                            let profIndex = serverSettings.profanityRoles.findIndex(r => r == role.id);
+                            msg.channel.send(Embeds.prototype.success(`<@&${remRole}> was removed from the profanity roles`));
+                            serverSettings.profanityRoles.splice(profIndex);
+                        } else {//guild link mode
+                            let remIndex = serverSettings.links.findIndex(r => r.role == role.id);
+                            msg.channel.send(Embeds.prototype.success(`<@&${remRole.role}> was unlinked`));
+                            serverSettings.links.splice(remIndex);
+                        }
                         return;
                     }
                 } catch (error) {
-                    log('ERR', `Failed to delete link to ${args[0]} : ${error}`);
+                    log('ERR', `Failed to delete link to ${args[0]} : ${error.message}`);
                     msg.channel.send(Embeds.prototype.error(`Failed to unlink this role, check 'roles', It might not exist`));
                 };
             };
             break;
 
         case "roles":
+            //this needs to be modified to include profanity roles too
+
             if (msg.channel.type == "dm") { msg.channel.send(Embeds.prototype.error("This command can only be used in servers")); return; };
             let collected = [];
             //create a list of configured roles for this server
-            let links = fetchSettings(msg.guild.id).links;
+            let links = serverSettings.links;
             if (links) {
                 links.forEach(l => {
                     let guild = config.guilds.find(g => g.id == l.guild);
-                    collected.push({ "name": guild.name, "rank": l.rank, "role": l.role });
+                    if (guild) collected.push({ "name": guild.name, "rank": l.rank, "role": l.role });
                 });
             }
             let quoteBlock = ""//the string to build for the embed
@@ -594,6 +652,12 @@ client.on("message", (msg) => {
                     };
                 });
             };
+            if (serverSettings.profanityRoles.length > 0) {
+                quoteBlock += "\nProfanity roles:"
+                serverSettings.profanityRoles.forEach(r => {
+                    quoteBlock += `\n> <@&${r}>`
+                })
+            }
             msg.channel.send(Embeds.prototype.default("Guild | Rank | And the role it's linked to" + quoteBlock, "Linked roles"));
             break;
 
@@ -631,7 +695,7 @@ client.on("message", (msg) => {
             //depreciated command
             if (msg.author.id != config.ownerID) { msg.react(emojis.cross); return; }
             if (msg.channel.type == "dm") { msg.channel.send(Embeds.prototype.error("This command can only be used in servers")); return; };
-            let s = JSON.stringify(fetchSettings(msg.guild.id), null, 1);//try to format while keeping it compact for embed
+            let s = JSON.stringify(serverSettings, null, 1);//try to format while keeping it compact for embed
             msg.channel.send("```json\n" + s + "```");
             break;
 
@@ -661,14 +725,14 @@ client.on("message", (msg) => {
             switch (args[0].toLowerCase()) {
                 case "unregisteredrole":
                     if (!args[1]) {//missing argument - show current setting
-                        if (!fetchSettings(msg.guild.id).muteRole) {
+                        if (!serverSettings.muteRole) {
                             msg.channel.send(Embeds.prototype.default("This setting is empty"))
                         } else {
-                            msg.channel.send(Embeds.prototype.default(`<@&${fetchSettings(msg.guild.id).unregisteredRole}> (${fetchSettings(msg.guild.id).unregisteredRole})`, "Current setting"))
+                            msg.channel.send(Embeds.prototype.default(`<@&${serverSettings.unregisteredRole}> (${serverSettings.unregisteredRole})`, "Current setting"))
                         }
                     } else {//args good
                         if (args[1] == "clear" || args[1] == "null" || args[1] == "reset") {//reset
-                            fetchSettings(msg.guild.id).unregisteredRole = ""
+                            serverSettings.unregisteredRole = ""
                             msg.channel.send(Embeds.prototype.success("Setting reset"))
                             return;
                         };
@@ -676,7 +740,7 @@ client.on("message", (msg) => {
                         if (!role) { msg.channel.send(Embeds.prototype.error("That tole doesn't exist")); return; };
                         prompt(msg.author, msg.channel, `This will give <@&${role.id}> to all unlinked accounts.\nProceed?`).then(r => {
                             if (r) {
-                                fetchSettings(msg.guild.id).unregisteredRole = role.id
+                                serverSettings.unregisteredRole = role.id
                                 msg.channel.send(Embeds.prototype.success("Role linked\nSet to 'null' to undo these changes"));
                             } else {
                                 msg.channel.send(Embeds.prototype.error("No changes were made"));
@@ -687,17 +751,17 @@ client.on("message", (msg) => {
 
                 case "blockprofanity":
                     if (!args[1]) {//show current setting
-                        msg.channel.send(Embeds.prototype.default(`\`\`\`${fetchSettings(msg.guild.id).blockProfanity}\`\`\``, "Current setting"))
+                        msg.channel.send(Embeds.prototype.default(`\`\`\`${serverSettings.blockProfanity}\`\`\``, "Current setting"))
                     } else {
                         if (args[1] == "off" || args[1] == "false" || args[1] == "reset") {//reset 
-                            if (!fetchSettings(msg.guild.id).blockProfanity) {//stops if its already setup
+                            if (!serverSettings.blockProfanity) {//stops if its already setup
                                 msg.channel.send(Embeds.prototype.error("This feature is already disabled"));
                                 return;
                             }
-                            fetchSettings(msg.guild.id).blockProfanity = false
+                            serverSettings.blockProfanity = false
                             msg.guild.fetchWebhooks().then(hooks => {//fetch all hooks // skips cache to avoid deleting hooks that were already deleted for some reason
                                 hooks.forEach(hook => {//for each
-                                    let ind = fetchSettings(msg.guild.id).webhooks.findIndex(h => h.url == hook.url)//find the hook under the server object
+                                    let ind = serverSettings.webhooks.findIndex(h => h.url == hook.url)//find the hook under the server object
                                     if (ind != -1) {//if it exists
                                         hook.delete(`${msg.author.username} disabled the profanity filter`).catch((err) => {
                                             msg.channel.send(Embeds.prototype.error("Failed to delete the webhooks! Please check my permissions and try again"))
@@ -705,35 +769,35 @@ client.on("message", (msg) => {
                                         })
                                     }
                                 })
-                                fetchSettings(msg.guild.id).webhooks = [];//set the array to empty just to be sure
+                                serverSettings.webhooks = [];//set the array to empty just to be sure
                             })
                             msg.channel.send(Embeds.prototype.success("Profanity filter disabled"))
                             return;
                         } else if (args[1] == "on" || args[1] == "true") {
-                            if (fetchSettings(msg.guild.id).blockProfanity) {//stops if its already setup
+                            if (serverSettings.blockProfanity) {//stops if its already setup
                                 msg.channel.send(Embeds.prototype.error("This feature is already enabled"));
                                 return;
                             }
                             prompt(msg.author, msg.channel, "Webhooks are used to enforce the profanity filter, and one will be created for each channel.\nContinue?").then(r => {
                                 if (r) {
                                     if (msg.guild.me.hasPermission('MANAGE_WEBHOOKS')) {
-                                        if (!fetchSettings(msg.guild.id).webhooks) fetchSettings(msg.guild.id).webhooks = []//start setup
+                                        if (!serverSettings.webhooks) serverSettings.webhooks = []//start setup
                                         let errors = false;
                                         //this part should be made async, with a queue system or something // I learned the hard way: that the CACHE IS NOT RELIABLE ANYMORE
                                         msg.guild.channels.valueOf().filter(c => c.type == 'text').forEach(ch => {//this may be causing ratelimit issues
                                             client.channels.fetch(ch.id, true).then(channel => {//fetch and create webhook - use cache to avoid ratelimit
                                                 channel.createWebhook("Profanity filter: #" + ch.name, { "avatar": "https://raw.githubusercontent.com/ALU52/DRA_bot/master/profanity.png", "reason": "Filter enabled by " + msg.author.username }).then(webhook => {
-                                                    fetchSettings(msg.guild.id).webhooks.push(new Webhook(webhook.channelID, webhook.url))//save it to memory for later use
+                                                    serverSettings.webhooks.push(new Webhook(webhook.channelID, webhook.url))//save it to memory for later use
                                                 }).catch((err) => {
                                                     errors = true;
                                                     log('ERR', `Failed to create webhook: ${err.message}`)
-                                                    fetchSettings(msg.guild.id).blockProfanity = false
+                                                    serverSettings.blockProfanity = false
                                                     msg.channel.send(Embeds.prototype.error(`Something went wrong during filter setup\n${err.message}`))
                                                 })
                                             })
                                             if (errors) return;
                                         })
-                                        fetchSettings(msg.guild.id).blockProfanity = true//enable the filter
+                                        serverSettings.blockProfanity = true//enable the filter
                                         msg.channel.send(Embeds.prototype.success("Profanity filter enabled"))//let them know it finished afterwards
                                     } else {
                                         msg.channel.send(Embeds.prototype.error("I don't have permission to manage webhooks"))
