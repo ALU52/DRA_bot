@@ -30,6 +30,10 @@
             "type": "boolean",
             "default": false
         },
+        "profanityRoles": {
+            "type": "object",
+            "default": []
+        },
         "links": {
             "type": "object",
             "default": []

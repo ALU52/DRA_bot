@@ -11,12 +11,11 @@ var webPush = new XMLHttpRequest();
 
 //some of these words cause too many false positives, so I'm having the bot ignore them
 //others are just flat out allowed because we're not children.
-var wordExceptions = ["crap", "ass", "damn", "hell", "god", "tit", "balls", "cum", "cums", "spac"];
-var BadWords = [];//build the bad word list on startup
-require("badwords/array").forEach(w => { if (!wordExceptions.includes(w.toLowerCase())) BadWords.push(w) })
+var BadWords = ['shit', 'fuck'];//build the bad word list on startup
 var wordRegex = new RegExp(BadWords.join("|"), 'gi');
 const { black } = require("color-name");
 const { count } = require("console");
+
 
 const client = new Discord.Client();//The bot client... duhhh
 const colors = { "success": 8311585, "error": 15609652, "warning": "#f0d000", "default": "#7289DA" };
@@ -388,7 +387,7 @@ client.on("message", (msg) => {
     if (msg.content && fetchSettings(msg.guild.id).blockProfanity && msg.deletable && !msg.author.bot && !msg.webhookID && msg.channel.type != "dm") {//check for profanity - ignore if no action can be taken
         if (fetchSettings(msg.guild.id).webhooks != []) {//if theres a bad word and a webhook is setup
             let rawMessage = msg.content.replace(/\s/g, "")//removes spaces that try to bypass it
-            let cleanedMessage = rawMessage.replace(wordRegex, function (match) { return match.replace(/./g, '■'); });
+            let cleanedMessage = rawMessage.replace(wordRegex, function (match) { return match.replace(/./g, '.'); });
             if (cleanedMessage != rawMessage) {//if changes were made, delete the message and replace it
                 let spaceLocations = []
                 let counter = 0;
