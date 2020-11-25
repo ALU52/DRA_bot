@@ -1,0 +1,55 @@
+{
+  "name": "dra_bot",
+  "version": "1.0.0",
+  "description": "https://github.com/ALU52/DRA_bot",
+  "main": "app.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "dependencies": {
+    "axios": "^0.21.0",
+    "better-discord": "^1.0.2",
+    "canvas": "^2.6.1",
+    "chalk": "^4.1.0",
+    "child-exec": "^1.0.0",
+    "crawler": "^1.2.2",
+    "data-forge": "^1.8.9",
+    "data-forge-plot": "^0.6.3",
+    "data-forge-fs": "^0.0.8",
+    "discord.js": "^12.3.1",
+    "execa": "^4.0.2",
+    "gmail-send": "^1.8.10",
+    "guild-wars-two-typescript-api-wrapper": "^1.5.0",
+    "hamsters.js": "^5.1.2",
+    "gw2-api": "^2.1.0",
+    "gw2api-client": "^7.4.1",
+    "htmlparser2": "^4.1.0",
+    "ifunny-web-api": "^1.0.1",
+    "infinite-campus": "^2.0.1",
+    "owp.workers": "^1.0.0",
+    "readline-sync": "^1.4.10",
+    "webhook-discord": "^3.7.3",
+    "xhr2": "^0.2.0",
+    "xmlhttprequest": "^1.8.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ALU52/DRA_bot.git"
+  },
+  "keywords": [
+    "bot",
+    "discord",
+    "roles",
+    "management"
+  ],
+  "author": "ALU52",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ALU52/DRA_bot/issues"
+  },
+  "homepage": "https://github.com/ALU52/DRA_bot#readme"
+}
