@@ -6,6 +6,7 @@ const exc = ["config.json", "app.log", "node_modules", "accounts.json", ".git", 
 const files = fs.readdirSync("./").filter(f => !exc.includes(f)).filter(f => !f.includes(".bak"))//only collect files that should be checked
 
 let needsRestart = false;
+const disableOverwriting = fs.existsSync("./test.js")//tries to detect a testing environment and stops ruining it like an annoying little shit
 var bot;//child process needs to be global
 
 /*
@@ -54,6 +55,7 @@ log('WARN', "Cold start detected")
 //checks files before proceeding
 
 function checkUpdates() {
+    if (disableOverwriting) return;
     //first check existing files
     needsRestart = false;
     files.forEach(f => {//for each file not on the ignore list
