@@ -2,6 +2,7 @@
 accounts.json
 test.js
 node_modules
+logs
 app.log
 package-lock.json
 config.json
