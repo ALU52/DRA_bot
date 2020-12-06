@@ -1,6 +1,6 @@
 # Alliance Bot
 
-Discord bot designed to interact with the Gw2 API and help with Guild role management.
+A Discord bot designed to interact with the Gw2 API and help with Guild role management.
 
 Libraries and APIs:
 - [Node.js](https://nodejs.org/en/about/)
