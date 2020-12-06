@@ -18,9 +18,6 @@ future versions will generate a config file, instead of downloading the one from
 manifest.files is mostly used for updates with new files, otherwise it doesn't really do anything.
 manifest.config is what does most of the work, it shows how the config structure should look. 
 ^ Default values are only used when the wrong data type is there, or while generating a new config.
-
-Future plans:
-have this file check dependencies too, installing them as needed
 */
 
 let conFail = 0;

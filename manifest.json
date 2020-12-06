@@ -1,16 +1,11 @@
 {
-    "comment": "This file tells the app what everything should look like",
     "files": [
         "bot.js",
         "app.js",
-        "sysRes.bat",
-        "start.bat",
-        "README.md",
         "profanity.png"
     ],
     "dependencies": [
         "discord.js",
-        "badwords",
         "xhr2"
     ],
     "serverSettings": {
@@ -48,6 +43,18 @@
             "type": "number",
             "default": 0
         },
+        "lastBackup": {
+            "type": "number",
+            "default": 0
+        },
+        "backupInterval": {
+            "type": "number",
+            "default": 8.64e+7
+        },
+        "queueDelay": {
+            "type": "number",
+            "default": 500
+        },
         "prefix": {
             "type": "string",
             "default": "gw."
@@ -62,7 +69,7 @@
         },
         "cacheTime": {
             "type": "number",
-            "default": 8.64e+7
+            "default": 2.88e+7
         },
         "serverSettings": {
             "type": "object",
@@ -75,10 +82,6 @@
         "ignoreList": {
             "type": "object",
             "default": []
-        },
-        "logPath": {
-            "type": "string",
-            "default": "./app.log"
         },
         "accountsPath": {
             "type": "string",

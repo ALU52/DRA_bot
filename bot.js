@@ -36,7 +36,7 @@ if (!config.ignoreList) config.ignoreList = [];//not sure if its safe to remove 
 //#region Classes
 class Embeds {
     /**
-     * 
+     * A normal embed message
      * @param {string} string The embed text
      * @param {title=} title The embed title
      */
@@ -56,24 +56,6 @@ class Embeds {
                     "color": colors.default,
                 }
             };
-        };
-    };
-    /**
-     * 
-     * @param {Discord.User} warnedUser The user that's being warned
-     */
-    noProfanity(warnedUser) {
-        return {
-            "embed": {
-                "title": "Oops!",
-                "description": `${emojis.cross} Please don't use that type of language here.`,
-                "color": colors.error,
-                "timestamp": Date.now(),
-                "author": {
-                    "name": warnedUser.username,
-                    "icon_url": warnedUser.avatarURL()
-                }
-            }
         };
     };
     /**
@@ -853,7 +835,6 @@ var queUpUsers = setInterval(() => {//adds every account to the update que - loo
 }, 300000);//fetches every 5 minutes
 
 //this is to avoid making the APIs angry with me
-let queueDelay = 500
 var queueTick = setInterval(() => {
     if (roleQueue.length >= 1) {//only run if theres someone there
         let member = roleQueue[roleQueue.length - 1];
@@ -874,6 +855,7 @@ var queueTick = setInterval(() => {
             }
             //linked, now use the cache or update it if needed
             if ((Date.now() - account.time) > config.cacheTime) {//outdated cache - update it and run the que on this account again
+                //Gw2 account details are only requested once every 8hrs. This API is critical to this bot, so we should play nice with it :P
                 try {
                     apiFetch('account', account.key).then(r => {//copied from handlewaitresponse()
                         //I hate how volatile these responses are
@@ -928,12 +910,12 @@ var queueTick = setInterval(() => {
             roleQueue.pop();
             return;
         }
-        //anything below this line should show up as 'unreachable.' We want it that way ;)
-        console.log(`Please check the queue interval. Unreachable code was triggered! Search for: MOWCMSJIN`)
+        //this part of the code should be UNREACHABLE. 
+        console.warn(`Please check queueTick. Not all code paths return a value`)
     }
-}, queueDelay);
-//file backup
-let backupTick = setInterval(() => {//saves the accounts to the file every 5 seconds
+}, config.queueDelay);
+
+let backupTick = setInterval(() => {//organizes files and creates backups
     manifest = require("./manifest.json")//time to load up the manifest again
     //verify config before saving it
     Object.getOwnPropertyNames(config).forEach(en => {//check data types
@@ -973,6 +955,36 @@ let backupTick = setInterval(() => {//saves the accounts to the file every 5 sec
             }
         })
     });
+    //backup done, now run daily operations if applicable
+    if (((Date.now() - config.lastBackup) >= config.backupInterval) || !config.lastBackup) {
+        log('INFO', "Running backups and purging old logs...")
+        config.lastBackup = Date.now();
+        //migrate logs to avoid having one big-ass file // I think its causing memory leaks
+        if (fs.existsSync("./logs/latest.log")) {
+            let newPath = `./logs/${new Date(Date.now()).toDateString().replace(/\s/g, "_")}.log`
+            fs.renameSync("./logs/latest.log", newPath)
+        }
+        //now see if any need to be deleted
+        fs.readdir("./logs/", (err, files) => {
+            if (err) {
+                log('ERR', err.message)
+                return;
+            }
+            let c = 0;
+            files.forEach(file => {
+                if ((Date.now() - fs.statSync(`./logs/${file}`).birthtimeMs) > (config.backupInterval * 7) && file != 'latest.log') {//deletes the files after they're a week old
+                    try {
+                        log("INFO", `Deleting ${file}`)
+                        fs.unlinkSync(`./logs/${file}`)
+                    } catch (error) {//I haven't tested this very much. Node
+                        log('ERR', "Failed to delete an old log file: " + error.message)
+                    }
+                }
+            })
+        })
+    }
+
+
 }, 5000);
 function stopBackup() {
     clearInterval(backupTick)//stop the timer
@@ -1170,12 +1182,15 @@ const characterMap = {//this is probably the worst thing I've ever created // ca
  * @param {string} message The event message
  */
 function log(type, message) {
-    let string = `[${type.toUpperCase()}](${Date.now()}) - ${message}`;
-    if (!config.logPath) return;
-    if (fs.existsSync(config.logPath)) {
-        fs.appendFileSync(config.logPath, "\n" + string);
+    let string = `[${type.toUpperCase()}](${new Date(Date.now()).toLocaleTimeString([], { hour12: false, timeZone: 'America/Chicago', timeZoneName: 'short' })}) - ${message}`;
+    let path = "./logs/latest.log"
+    if (!fs.existsSync("./logs/")) {
+        fs.mkdirSync("./logs")
+    }
+    if (fs.existsSync(path)) {
+        fs.appendFileSync(path, "\n" + string);
     } else {
-        fs.writeFileSync(config.logPath, string);
+        fs.writeFileSync(path, string);
     }
 };
 
